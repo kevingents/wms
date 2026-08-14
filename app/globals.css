@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Voorkomt dat iOS inzoomt op invoervelden — funest bij scannen. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-cream text-navy antialiased;
+  }
+
+  /* Scanner-invoer: nooit autocorrect of hoofdletter-magie op een barcode. */
+  input[data-scan] {
+    @apply font-mono tracking-wide;
+    text-transform: uppercase;
+  }
+}
+
+@layer utilities {
+  /* Onderdrukt de spinners op number-inputs; het aantal wordt geteld, niet
+     omhooggeklikt. */
+  .geen-spinner::-webkit-outer-spin-button,
+  .geen-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .geen-spinner {
+    -moz-appearance: textfield;
+  }
+}
