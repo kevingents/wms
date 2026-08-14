@@ -62,6 +62,13 @@ we oplossen: voorraad die niet klopt en niemand die kan zeggen waarom.
 | Verzenden en labels | 🟡 | Zending vastgelegd; vervoerder-API nog niet |
 | **Reverse** | | |
 | Retouren ontvangen en beoordelen | ✅ | Verkoopbaar / herstel / afkeur |
+| **Financieel** | | |
+| Kostprijs per artikel, met historie | ✅ | Uit SRS-verkopen; handmatig te overrulen |
+| Waardering per mutatie | ✅ | Voortschrijdend gemiddelde, bevroren bij boeking |
+| Sluitcontrole voorraadwaarde | ✅ | in − uit = op voorraad, één query |
+| Journaalposten (dubbel boekhouden) | ✅ | Debet = credit per gebeurtenis |
+| Periodeafsluiting met slot | ✅ | Database weigert boeken in een dichte maand |
+| Doorschieten naar Exact | 🟡 | Regels staan klaar; de API-call zelf nog niet |
 | **Sturing** | | |
 | SRS-schaduwvergelijking | ✅ | Nachtelijk, per sku |
 | Koppeling met de portal | ✅ | Eén deur, beide richtingen |

@@ -26,6 +26,7 @@ export interface InstellingDefinitie {
     | "Inpakken"
     | "Aanvullen"
     | "Tellen"
+    | "Financieel"
     | "Shadow-fase"
     | "Scannen";
   standaard: unknown;
@@ -181,6 +182,41 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
     type: "schakelaar",
     groep: "Scannen",
     standaard: true,
+  },
+  {
+    key: "financieel.gl_voorraad",
+    label: "Grootboek — Voorraad",
+    uitleg:
+      "Balansrekening waarop de voorraadwaarde staat. Zolang dit leeg is worden er geen journaalposten klaargezet; de waardering loopt wel gewoon door.",
+    type: "tekst",
+    groep: "Financieel",
+    standaard: "",
+  },
+  {
+    key: "financieel.gl_te_ontvangen",
+    label: "Grootboek — Nog te ontvangen facturen",
+    uitleg:
+      "Tegenrekening bij ontvangst. De goederen zijn binnen, de factuur nog niet — dat verschil hoort zichtbaar te zijn.",
+    type: "tekst",
+    groep: "Financieel",
+    standaard: "",
+  },
+  {
+    key: "financieel.gl_kostprijs_verkopen",
+    label: "Grootboek — Kostprijs verkopen",
+    uitleg: "Kostenrekening waarop uitgaande voorraad wordt geboekt.",
+    type: "tekst",
+    groep: "Financieel",
+    standaard: "",
+  },
+  {
+    key: "financieel.gl_voorraadverschil",
+    label: "Grootboek — Voorraadverschillen",
+    uitleg:
+      "Waar telverschillen en afschrijvingen heen gaan. Een aparte rekening, want dit is precies het bedrag dat je wilt zien dalen.",
+    type: "tekst",
+    groep: "Financieel",
+    standaard: "",
   },
   {
     key: "shadow.actief",

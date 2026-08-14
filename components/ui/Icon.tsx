@@ -31,6 +31,13 @@ const PATHS: Record<string, React.ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </>
   ),
+  euro: (
+    <>
+      <path d="M17 5.3A7 7 0 0 0 7.6 9M7.6 15a7 7 0 0 0 9.4 3.7" />
+      <path d="M4 10h9" />
+      <path d="M4 14h9" />
+    </>
+  ),
   retour: (
     <>
       <path d="M3 12a9 9 0 1 0 3-6.7" />

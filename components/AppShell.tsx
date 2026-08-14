@@ -29,6 +29,7 @@ const MENU: { pad: string; label: string; icon: IconName }[] = [
   { pad: "/locaties", label: "Locaties", icon: "locatie" },
   { pad: "/", label: "Overzicht", icon: "dashboard" },
   { pad: "/kpi", label: "Cijfers", icon: "grafiek" },
+  { pad: "/financieel", label: "Financieel", icon: "euro" },
   { pad: "/shadow", label: "SRS-check", icon: "synchroniseer" },
 ];
 
