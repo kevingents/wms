@@ -49,6 +49,65 @@ export function InslagView({
   const [bezig, setBezig] = useState(false);
   const [bevestigLaden, setBevestigLaden] = useState(false);
 
+  /* SRS kent bin-locaties per sku. Als die er zijn is dat de betere go-live:
+     voorraad meteen op het juiste vak in plaats van alles op één hoop. */
+  const [srs, setSrs] = useState<{
+    regels: number;
+    locaties: number;
+    skus: number;
+    stuks: number;
+    geblokkeerd: number;
+    generatedAt: string | null;
+  } | null>(null);
+  const [srsFout, setSrsFout] = useState("");
+  const [srsGekeken, setSrsGekeken] = useState(false);
+  const [bevestigSrs, setBevestigSrs] = useState(false);
+
+  async function kijkNaarSrs() {
+    setBezig(true);
+    setSrsFout("");
+    try {
+      const res = await fetch("/api/srs-locaties");
+      const data = await res.json();
+      setSrsGekeken(true);
+      if (!res.ok || !data.ok) {
+        setSrsFout(data.message || "Locaties opvragen mislukt.");
+        return;
+      }
+      setSrs(data);
+    } catch {
+      setSrsFout("Geen verbinding met de server.");
+    } finally {
+      setBezig(false);
+    }
+  }
+
+  async function importeerSrs() {
+    setBezig(true);
+    setFout("");
+    setMelding("");
+    try {
+      const res = await fetch("/api/srs-locaties", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setFout(data.message || "Importeren mislukt.");
+        return;
+      }
+      setMelding(
+        `${data.stuks.toLocaleString("nl-NL")} stuks geboekt op ${data.locaties.toLocaleString("nl-NL")} locaties uit SRS.` +
+          (data.geblokkeerd > 0
+            ? ` ${data.geblokkeerd} locatie(s) staan geblokkeerd en zijn niet pikbaar gemaakt.`
+            : "")
+      );
+      setBevestigSrs(false);
+      router.refresh();
+    } catch {
+      setFout("Geen verbinding met de server.");
+    } finally {
+      setBezig(false);
+    }
+  }
+
   async function kiesLocatie(code: string) {
     setFout("");
     try {
@@ -179,14 +238,82 @@ export function InslagView({
       {melding && <Melding soort="ok">{melding}</Melding>}
       {fout && <Melding soort="bad">{fout}</Melding>}
 
-      {/* ── Eenmalige go-live ────────────────────────────────────────────── */}
-      {!voorbeeld.alGeladen && magBeheren && voorbeeld.skus > 0 && (
-        <Kaart titel="Beginvoorraad uit SRS">
+      {/* ── Go-live variant 1: mét locaties uit SRS (de betere) ──────────── */}
+      {!voorbeeld.alGeladen && magBeheren && (
+        <Kaart titel="Locaties en voorraad uit SRS">
           <p className="text-sm text-slate">
-            Boekt de complete SRS-magazijnvoorraad in één keer naar de wachtlocatie. De
-            totalen kloppen daarna meteen — het verschil met SRS wordt nul — terwijl de
-            exacte plek nog onbekend is. Daarna verhuis je scannend naar echte vakken,
-            zonder dat het systeem ooit verkeerd staat.
+            SRS houdt per vak bij wat er ligt. Als die gegevens er zijn, maken we de
+            locaties aan en zetten we de voorraad meteen op het juiste vak — dan hoeft het
+            magazijn niet te herindelen, alleen te controleren. Dit is de voorkeursroute.
+          </p>
+
+          {!srsGekeken ? (
+            <Knop variant="secundair" className="mt-3 w-full" onClick={kijkNaarSrs} disabled={bezig}>
+              <Icon name="zoek" size={16} />
+              {bezig ? "Bezig…" : "Kijk wat SRS kent"}
+            </Knop>
+          ) : srsFout ? (
+            <div className="mt-3 space-y-2">
+              <Melding soort="warn">{srsFout}</Melding>
+              <p className="text-xs text-slate">
+                Gebruik zolang de route hieronder: alles op één wachtlocatie.
+              </p>
+            </div>
+          ) : srs ? (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Kental
+                  label="Locaties in SRS"
+                  waarde={srs.locaties.toLocaleString("nl-NL")}
+                  toelichting={`${srs.regels.toLocaleString("nl-NL")} regels`}
+                />
+                <Kental
+                  label="Stuks op vakken"
+                  waarde={srs.stuks.toLocaleString("nl-NL")}
+                  toelichting={`${srs.skus.toLocaleString("nl-NL")} sku's`}
+                />
+              </div>
+              {srs.stuks < voorbeeld.stuks && (
+                <Melding soort="warn">
+                  SRS meldt {voorbeeld.stuks.toLocaleString("nl-NL")} stuks voorraad maar
+                  heeft er maar {srs.stuks.toLocaleString("nl-NL")} op een vak staan. Het
+                  verschil van {(voorbeeld.stuks - srs.stuks).toLocaleString("nl-NL")} stuks
+                  ligt zonder locatie — die kun je daarna alsnog op de wachtlocatie zetten.
+                </Melding>
+              )}
+              {!bevestigSrs ? (
+                <Knop className="mt-3 w-full" onClick={() => setBevestigSrs(true)}>
+                  Locaties en voorraad overnemen
+                </Knop>
+              ) : (
+                <div className="mt-3 space-y-2 rounded-lg border border-warn bg-warn-50 p-3">
+                  <p className="text-sm font-medium text-warn">
+                    Dit maakt {srs.locaties.toLocaleString("nl-NL")} locaties aan en boekt{" "}
+                    {srs.stuks.toLocaleString("nl-NL")} stuks. Kan maar één keer.
+                  </p>
+                  <div className="flex gap-2">
+                    <Knop onClick={importeerSrs} disabled={bezig} className="flex-1">
+                      {bezig ? "Bezig…" : "Ja, overnemen"}
+                    </Knop>
+                    <Knop variant="secundair" onClick={() => setBevestigSrs(false)}>
+                      Annuleren
+                    </Knop>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
+        </Kaart>
+      )}
+
+      {/* ── Go-live variant 2: alles op één wachtlocatie (vangnet) ───────── */}
+      {!voorbeeld.alGeladen && magBeheren && voorbeeld.skus > 0 && (
+        <Kaart titel="Of: alles op één wachtlocatie">
+          <p className="text-sm text-slate">
+            Boekt de complete SRS-magazijnvoorraad naar de wachtlocatie, zonder
+            vakindeling. De totalen kloppen dan meteen — het verschil met SRS wordt nul —
+            terwijl de exacte plek nog onbekend is. Daarna verhuis je scannend naar echte
+            vakken. Gebruik dit als SRS geen bruikbare locatiegegevens heeft.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <Kental
