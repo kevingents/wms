@@ -86,6 +86,43 @@ die we aan het opruimen zijn. Sleutel is `sku`, net als in `srs_stock` en
 Eigen schema, niet `public`: Drizzle beheert `public` vanuit gentsnext en zou
 losse tabellen daar als drift zien.
 
+## Handterminal
+
+De app is een PWA: op een handscanner (Zebra, Honeywell) of telefoon installeer
+je 'm via "Toevoegen aan startscherm" en start hij volledig scherm zonder
+browserbalk. `start_url` is `/terminal` — een tegelmenu voor een klein scherm,
+niet het dashboard.
+
+- **Scannen** gaat via gewone tekstvelden met Enter-afhandeling. Vrijwel elke
+  magazijnscanner is keyboard-wedge: hij typt de code en drukt Enter. Dat is
+  betrouwbaarder dan camera-scanning en werkt met élke scanner.
+- **Camera** is de terugvalweg, voor een telefoon of een kapotte scannerkop.
+  `@zxing/browser` wordt pas geladen als je de camera opent.
+- **Service worker** cachet alleen de statische assets en toont een eerlijke
+  offline-pagina. Bewust géén gecachete voorraadstanden: een stand die er
+  betrouwbaar uitziet maar drie uur oud is, is in een magazijn gevaarlijker dan
+  een foutmelding. Offline schrijven loopt via de outbox in IndexedDB.
+
+## Inslag en go-live
+
+`laadBeginvoorraad()` boekt de complete SRS-magazijnvoorraad in **één statement**
+naar de wachtlocatie `ONBEKEND`. Vanaf dat moment kloppen de totalen — het
+shadow-verschil wordt nul — terwijl de exacte plek nog onbekend is. Daarna
+verhuist de vloer die voorraad scannend naar echte vakken, zonder dat het systeem
+ooit "verkeerd" staat.
+
+Dat is de omgekeerde volgorde van wat intuïtief voelt, en met opzet: eerst
+kloppen op totaal, dan verfijnen op locatie. Het alternatief — 4.285 sku's met de
+hand inscannen voordat je iets kunt — kost weken en levert een systeem op dat al
+die tijd niet klopt.
+
+De actie is eenmalig: een tweede import zou de voorraad verdubbelen en wordt
+geweigerd. Latere verschillen corrigeer je met tellingen.
+
+Snelle inslag houdt de locatie vast en boekt bij elke artikelscan direct door.
+Wie een pallet uitpakt wil niet bij elk stuk opnieuw het vak scannen. Ongedaan
+maken is een tegenboeking, geen verwijdering.
+
 ## Picken
 
 Het uitgaande werk. Pickopdrachten komen uit twee bronnen, beide al aanwezig in

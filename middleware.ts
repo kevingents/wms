@@ -27,6 +27,11 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
+/* Buiten de poort: build-assets, en alles wat de PWA nodig heeft vóórdat er een
+   sessie is. Een service worker of manifest achter een redirect naar /login
+   maakt de app onistalleerbaar. */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|sw\\.js|offline\\.html).*)",
+  ],
 };

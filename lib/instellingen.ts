@@ -19,7 +19,7 @@ export interface InstellingDefinitie {
   label: string;
   uitleg: string;
   type: InstellingType;
-  groep: "Magazijn" | "Picken" | "Tellen" | "Shadow-fase" | "Scannen";
+  groep: "Magazijn" | "Inslag" | "Picken" | "Tellen" | "Shadow-fase" | "Scannen";
   standaard: unknown;
 }
 
@@ -49,6 +49,24 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
     type: "tekst",
     groep: "Magazijn",
     standaard: "^[A-Z]{1,4}(-\\d{1,3}){0,3}$",
+  },
+  {
+    key: "inslag.startlocatie",
+    label: "Wachtlocatie beginvoorraad",
+    uitleg:
+      "Waar de beginvoorraad uit SRS naartoe gaat zolang de echte plek onbekend is. Vanaf hier verhuist de vloer scannend naar echte vakken.",
+    type: "tekst",
+    groep: "Inslag",
+    standaard: "ONBEKEND",
+  },
+  {
+    key: "inslag.standaard_aantal",
+    label: "Standaard aantal per scan",
+    uitleg:
+      "Hoeveel er per artikelscan geboekt wordt bij snelle inslag. Zet op 1 voor stuksgoed; hoger als je per doos inboekt.",
+    type: "getal",
+    groep: "Inslag",
+    standaard: 1,
   },
   {
     key: "picken.expeditie_locatie",

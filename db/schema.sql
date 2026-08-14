@@ -377,6 +377,18 @@ ON CONFLICT (code) DO NOTHING
 CREATE SEQUENCE IF NOT EXISTS wms.pick_order_nummer START 1
 --;;
 
+-- Wachtlocatie voor de beginvoorraad. Bij de go-live boeken we de complete
+-- SRS-magazijnvoorraad hierheen: de totalen kloppen dan meteen (shadow-verschil
+-- nul) terwijl de exacte plek nog onbekend is. Daarna verhuist de vloer die
+-- voorraad scannend naar echte vakken, zonder dat het systeem ooit "verkeerd"
+-- staat. `pickable` staat aan zodat er vanaf dag één gepikt kan worden; de
+-- toewijzing geeft echte piklocaties voorrang, dus dit vak loopt vanzelf leeg.
+INSERT INTO wms.locations (code, name, zone, kind, sort_order, pickable, note)
+VALUES ('ONBEKEND', 'Nog niet ingedeeld', 'ONBEKEND', 'bulk', 0, true,
+        'Beginvoorraad uit SRS. Verhuis hiervandaan naar echte vakken.')
+ON CONFLICT (code) DO NOTHING
+--;;
+
 -- ── Instellingen (huisregel: config in de tool, niet in Vercel) ─────────────
 CREATE TABLE IF NOT EXISTS wms.settings (
   key        text PRIMARY KEY,

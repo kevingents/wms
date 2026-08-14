@@ -11,13 +11,17 @@ import { cn } from "@/lib/cn";
  * een scanner) en links op groot scherm.
  */
 
+/* Op de handterminal is /terminal het startscherm; op een bureaublad /. Beide
+   staan in het menu zodat je er altijd uit kunt. */
 const MENU: { pad: string; label: string; icon: IconName }[] = [
-  { pad: "/", label: "Overzicht", icon: "dashboard" },
+  { pad: "/terminal", label: "Terminal", icon: "terminal" },
   { pad: "/picken", label: "Picken", icon: "pick" },
+  { pad: "/inslag", label: "Inslag", icon: "inslag" },
   { pad: "/scan", label: "Scannen", icon: "scan" },
   { pad: "/voorraad", label: "Voorraad", icon: "box" },
-  { pad: "/locaties", label: "Locaties", icon: "locatie" },
   { pad: "/tellen", label: "Tellen", icon: "tellen" },
+  { pad: "/", label: "Overzicht", icon: "dashboard" },
+  { pad: "/locaties", label: "Locaties", icon: "locatie" },
   { pad: "/shadow", label: "SRS-check", icon: "synchroniseer" },
 ];
 
@@ -46,7 +50,7 @@ export function AppShell({
           <div className="mt-0.5 text-xs text-white/60">{magazijn}</div>
         </div>
 
-        {MENU.map((m) => {
+        {MENU.map((m, i) => {
           const actief = m.pad === "/" ? pad === "/" : pad.startsWith(m.pad);
           return (
             <Link
@@ -56,6 +60,10 @@ export function AppShell({
               className={cn(
                 "flex min-h-tap flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
                 "sm:flex-none sm:flex-row sm:justify-start sm:gap-3 sm:rounded-lg sm:px-3 sm:text-sm",
+                /* De onderbalk van een handterminal heeft plek voor vijf tegels;
+                   de rest bereik je via het startscherm. Op een bureaublad past
+                   het hele menu wel in de zijbalk. */
+                i >= 5 && "hidden sm:flex",
                 actief ? "bg-navy-600 text-white" : "text-white/70 hover:text-white"
               )}
             >

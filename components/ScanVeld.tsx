@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { CameraScanner } from "@/components/CameraScanner";
 import { cn } from "@/lib/cn";
 
 /**
@@ -22,6 +23,7 @@ export function ScanVeld({
   actief = true,
   klaar = false,
   hint,
+  camera = true,
 }: {
   label: string;
   waarde: string;
@@ -31,6 +33,8 @@ export function ScanVeld({
   actief?: boolean;
   klaar?: boolean;
   hint?: string;
+  /** Camera-terugval tonen. Uit voor velden waar typen sneller is. */
+  camera?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
 
@@ -74,6 +78,16 @@ export function ScanVeld({
         />
       </div>
       {hint && <p className="mt-1 text-xs text-slate">{hint}</p>}
+      {camera && !klaar && actief && (
+        <div className="mt-2">
+          <CameraScanner
+            onCode={(code) => {
+              onWaarde(code);
+              onScan(code);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
