@@ -541,6 +541,15 @@ async function werkOpdrachtStatusBij(pickOrderId: number): Promise<void> {
       /* Terugmelden is bijzaak; het grootboek klopt sowieso. */
     }
   }
+
+  /* Zit deze opdracht in een pickronde, dan kan die ronde nu klaar zijn. */
+  try {
+    const { rondeVanOpdracht, werkRondeStatusBij } = await import("./rondes");
+    const rondeId = await rondeVanOpdracht(pickOrderId);
+    if (rondeId) await werkRondeStatusBij(rondeId);
+  } catch {
+    /* Ronde-status is presentatie; de opdracht zelf klopt hoe dan ook. */
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { kerncijfers } from "@/lib/voorraad";
 import { werkvoorraad } from "@/lib/picken";
+import { openRondes } from "@/lib/rondes";
 import { indeelVoortgang } from "@/lib/inslag";
 import { huidigeGebruiker } from "@/lib/auth-server";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -22,7 +23,8 @@ const TEGELS: {
   icon: IconName;
   omschrijving: string;
 }[] = [
-  { pad: "/picken", label: "Picken", icon: "pick", omschrijving: "Orders uitleveren" },
+  { pad: "/rondes", label: "Rondes", icon: "kar", omschrijving: "Batch met bakken" },
+  { pad: "/picken", label: "Picken", icon: "pick", omschrijving: "Losse order" },
   { pad: "/inslag", label: "Inslag", icon: "inslag", omschrijving: "Voorraad inboeken" },
   { pad: "/scan", label: "Verplaatsen", icon: "scan", omschrijving: "Tussen vakken" },
   { pad: "/tellen", label: "Tellen", icon: "tellen", omschrijving: "Locatie controleren" },
@@ -31,14 +33,16 @@ const TEGELS: {
 ];
 
 export default async function TerminalPagina() {
-  const [cijfers, opdrachten, voortgang, user] = await Promise.all([
+  const [cijfers, opdrachten, rondes, voortgang, user] = await Promise.all([
     kerncijfers(),
     werkvoorraad(),
+    openRondes(),
     indeelVoortgang(),
     huidigeGebruiker(),
   ]);
 
   const tellers: Record<string, string | null> = {
+    "/rondes": rondes.length > 0 ? String(rondes.length) : null,
     "/picken": opdrachten.length > 0 ? String(opdrachten.length) : null,
     "/inslag":
       voortgang.wachtend_stuks > 0

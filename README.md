@@ -161,6 +161,28 @@ gestuurd. Ligt het er onverhoopt niet, dan meldt de picker "minder gevonden" en
 wijst het systeem het restant toe aan een andere locatie. Een echte reservering
 met tegenboekingen kost hier meer dan het oplevert.
 
+### Pickrondes: batchpicken met bakken
+
+Zoals het magazijn echt werkt. Webshoporders worden eerst verzameld tot één
+ronde; elke order krijgt een genummerde bak op de kar. De picker loopt het
+magazijn **één keer** door: bij elk vak pakt hij het totaal voor alle orders
+samen en verdeelt dat over de bakken. Aan het eind bevat elke bak precies één
+order, klaar voor inpakken.
+
+Tien orders van twee regels zijn zo één ronde in plaats van tien rondes. Het
+loopwerk is de kostenpost, niet het grijpen — dit is de grootste winst in het
+hele pickproces.
+
+De ronde is een **laag bovenop** de pickopdrachten, geen vervanging: de regels,
+de toewijzing en het grootboek blijven ongewijzigd, en bevestigen loopt nog
+steeds per pickregel. Een order kan dus ook gewoon los gepikt worden.
+
+Twee invarianten die de database bewaakt, omdat je ze anders pas bij het
+inpakken ontdekt: één order per bak (en één bak per order), en een order zit in
+hoogstens één ronde tegelijk.
+
+### Twee boekingen
+
 Picken is **twee boekingen**, niet één:
 
 1. `pick` — van de piklocatie naar `EXPEDITIE`. De goederen zijn uit het schap

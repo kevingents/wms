@@ -76,6 +76,15 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
     standaard: 1,
   },
   {
+    key: "picken.bakken_per_kar",
+    label: "Bakken per kar",
+    uitleg:
+      "Hoeveel orders er maximaal in één pickronde passen — één bak per order. Bepaalt hoe groot een batch mag worden.",
+    type: "getal",
+    groep: "Picken",
+    standaard: 12,
+  },
+  {
     key: "picken.expeditie_locatie",
     label: "Expeditielocatie",
     uitleg:

@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn";
    staan in het menu zodat je er altijd uit kunt. */
 const MENU: { pad: string; label: string; icon: IconName }[] = [
   { pad: "/terminal", label: "Terminal", icon: "terminal" },
+  { pad: "/rondes", label: "Rondes", icon: "kar" },
   { pad: "/picken", label: "Picken", icon: "pick" },
   { pad: "/inslag", label: "Inslag", icon: "inslag" },
   { pad: "/scan", label: "Scannen", icon: "scan" },

@@ -31,6 +31,16 @@ const PATHS: Record<string, React.ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </>
   ),
+  /* Pickkar met bakken — batchpicken. */
+  kar: (
+    <>
+      <rect x="3" y="5" width="18" height="10" rx="1" />
+      <path d="M9 5v10" />
+      <path d="M15 5v10" />
+      <circle cx="7.5" cy="19" r="1.5" />
+      <circle cx="16.5" cy="19" r="1.5" />
+    </>
+  ),
   terminal: (
     <>
       <rect x="6" y="2" width="12" height="20" rx="2" />

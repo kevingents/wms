@@ -437,6 +437,80 @@ VALUES ('ONBEKEND', 'Nog niet ingedeeld', 'ONBEKEND', 'bulk', 0, true,
 ON CONFLICT (code) DO NOTHING
 --;;
 
+-- ── Pickrondes: batchpicken met bakken ──────────────────────────────────────
+-- Hoe het magazijn echt werkt: webshoporders worden eerst verzameld tot één
+-- ronde, elke order krijgt een genummerde bak op de kar, en de picker loopt het
+-- magazijn ÉÉN keer door. Bij elk vak pakt hij het totaal voor alle orders
+-- samen en verdeelt dat over de bakken. Aan het eind bevat elke bak precies één
+-- order, klaar voor inpakken.
+--
+-- Tien orders van twee regels zijn zo één ronde in plaats van tien rondes. Dat
+-- is het hele punt: het loopwerk is de kostenpost, niet het grijpen.
+--
+-- Dit is bewust een LAAG BOVENOP de bestaande pickopdrachten, geen vervanging.
+-- De regels, de toewijzing en het grootboek blijven precies zoals ze waren; een
+-- ronde is alleen een andere volgorde om er doorheen te lopen. Daardoor kan een
+-- order ook gewoon los gepikt worden als dat een keer beter uitkomt.
+CREATE TABLE IF NOT EXISTS wms.pick_rondes (
+  id            bigserial PRIMARY KEY,
+  code          text NOT NULL UNIQUE,
+  status        text NOT NULL DEFAULT 'open',
+  gestart_door  text,
+  gestart_naam  text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  started_at    timestamptz,
+  finished_at   timestamptz,
+  note          text,
+  CONSTRAINT rondes_status_chk CHECK (
+    status IN ('open', 'bezig', 'gepikt', 'afgesloten', 'geannuleerd')
+  )
+)
+--;;
+CREATE SEQUENCE IF NOT EXISTS wms.pick_ronde_nummer START 1
+--;;
+
+-- Welke opdracht ligt in welke bak. Twee keer uniek: één bak per opdracht, en
+-- één opdracht per bak. Een bak die per ongeluk twee orders bevat is precies de
+-- fout die je bij inpakken pas ontdekt, en dan is het te laat.
+CREATE TABLE IF NOT EXISTS wms.pick_ronde_orders (
+  ronde_id      bigint NOT NULL REFERENCES wms.pick_rondes (id) ON DELETE CASCADE,
+  pick_order_id bigint NOT NULL REFERENCES wms.pick_orders (id) ON DELETE CASCADE,
+  bak           integer NOT NULL,
+  PRIMARY KEY (ronde_id, pick_order_id),
+  UNIQUE (ronde_id, bak),
+  CONSTRAINT ronde_bak_chk CHECK (bak > 0)
+)
+--;;
+-- Een opdracht hoort in hoogstens één ronde tegelijk; anders lopen twee pickers
+-- dezelfde order en pakt de tweede lucht.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ronde_order_uniek
+  ON wms.pick_ronde_orders (pick_order_id)
+--;;
+
+-- De looplijst: alle regels van alle opdrachten in een ronde, op vakvolgorde,
+-- met de bak erbij. Eén rij per (vak × sku × bak) — dat is precies wat de picker
+-- bij een stop moet weten: hoeveel pakken, en in welke bakken verdelen.
+CREATE OR REPLACE VIEW wms.ronde_stops AS
+SELECT ro.ronde_id,
+       l.location_id,
+       loc.code        AS location_code,
+       loc.zone,
+       loc.sort_order,
+       l.sku,
+       ro.bak,
+       ro.pick_order_id,
+       po.code         AS opdracht_code,
+       po.bestemming,
+       l.id            AS regel_id,
+       l.gevraagd,
+       l.gepikt,
+       l.status
+  FROM wms.pick_ronde_orders ro
+  JOIN wms.pick_lines l   ON l.pick_order_id = ro.pick_order_id
+  JOIN wms.pick_orders po ON po.id = ro.pick_order_id
+  LEFT JOIN wms.locations loc ON loc.id = l.location_id
+--;;
+
 -- ── Instellingen (huisregel: config in de tool, niet in Vercel) ─────────────
 CREATE TABLE IF NOT EXISTS wms.settings (
   key        text PRIMARY KEY,
