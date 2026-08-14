@@ -27,8 +27,17 @@ export interface SrsLocatieRij {
   geblokkeerd: boolean;
 }
 
+interface FiliaalSamenvatting {
+  filiaalNummer: string;
+  store: string;
+  locaties: number;
+  totalAantal: number;
+  geblokkeerd: number;
+}
+
 interface LocatieAntwoord {
   success?: boolean;
+  empty?: boolean;
   generatedAt?: string;
   sourceFile?: string;
   count?: number;
@@ -36,23 +45,57 @@ interface LocatieAntwoord {
   limit?: number;
   rows?: SrsLocatieRij[];
   truncated?: boolean;
+  totalRows?: number;
+  summary?: { filialen?: FiliaalSamenvatting[] };
   message?: string;
 }
 
 const PAGINA = 5000;
 const MAX_PAGINAS = 20;
 
+async function vraagStoregents(pad: string): Promise<LocatieAntwoord> {
+  const { ok, status, data } = await backendJson<LocatieAntwoord>(
+    `api/admin/voorraad-locaties${pad}`,
+    { method: "GET" },
+    true
+  );
+  if (!ok || !data?.success) {
+    throw new BoekingsFout(
+      data?.message ||
+        (status === 401
+          ? "storegents weigert de ADMIN_TOKEN. Controleer of de waarde in dit project gelijk is aan die van storegents."
+          : `storegents gaf status ${status} op de locatie-opvraag.`),
+      "backend_fout"
+    );
+  }
+  return data;
+}
+
+export interface SrsLocatieBron {
+  rijen: SrsLocatieRij[];
+  generatedAt: string | null;
+  bron: string | null;
+  /** Wat de samenvatting zegt dat er zou moeten zijn — los van wat we kregen. */
+  verwachteRegels: number;
+  verwachteStuks: number;
+  store: string | null;
+  volledig: boolean;
+}
+
 /**
- * Haalt alle locatieregels van één filiaal op, pagina voor pagina.
+ * Haalt de locatieregels van één filiaal op.
  *
- * De oude versie van het endpoint kende geen `offset` en kapte af op 500. Dat
- * herkennen we: als er meer is dan we kregen maar het antwoord geen `offset`
- * teruggeeft, stoppen we met een duidelijke melding in plaats van stilletjes een
- * onvolledige voorraad te importeren.
+ * Eerst de samenvatting opvragen (die werkt op élke versie van het endpoint en
+ * geeft per filiaal het aantal regels), daarna pas de regels zelf. Zo weten we
+ * altijd of wat we terugkrijgen compleet is — en kunnen we het verschil tussen
+ * "SRS kent geen locaties voor het magazijn" en "het endpoint levert ze niet
+ * uit" benoemen. Dat scheelt een middag zoeken.
+ *
+ * Filteren gebeurt op winkelnaam en niet op `branchId`: dat eerste kent élke
+ * versie van het endpoint. `branchId` en de paginering gaan wel mee, maar een
+ * oudere versie negeert die gewoon.
  */
-export async function haalSrsLocaties(
-  branchId = "99"
-): Promise<{ rijen: SrsLocatieRij[]; generatedAt: string | null; bron: string | null }> {
+export async function haalSrsLocaties(branchId = "99"): Promise<SrsLocatieBron> {
   if (!backendBase()) {
     throw new BoekingsFout(
       "BACKEND_API_BASE ontbreekt — de SRS-locaties kunnen niet opgehaald worden.",
@@ -66,46 +109,76 @@ export async function haalSrsLocaties(
     );
   }
 
+  /* ── 1. Wat zegt de samenvatting dat er is? ─────────────────────────────── */
+  const overzicht = await vraagStoregents("");
+
+  if (overzicht.empty) {
+    throw new BoekingsFout(
+      "storegents heeft nog geen locatie-snapshot. Draai eerst /api/cron/srs-voorraad-import daar.",
+      "geen_snapshot"
+    );
+  }
+
+  const filialen = overzicht.summary?.filialen ?? [];
+  const filiaal = filialen.find((f) => String(f.filiaalNummer) === branchId);
+
+  if (!filiaal || filiaal.locaties === 0) {
+    const bekend = filialen
+      .slice(0, 8)
+      .map((f) => `${f.filiaalNummer} (${f.locaties})`)
+      .join(", ");
+    throw new BoekingsFout(
+      `SRS exporteert geen bin-locaties voor filiaal ${branchId}. ` +
+        (filialen.length
+          ? `Wel voor: ${bekend}${filialen.length > 8 ? ", …" : ""}. Het magazijn zit dus niet in de locatie-export van SRS.`
+          : "De snapshot bevat helemaal geen filialen."),
+      "geen_locaties_voor_filiaal"
+    );
+  }
+
+  /* ── 2. De regels zelf, pagina voor pagina ──────────────────────────────── */
   const rijen: SrsLocatieRij[] = [];
-  let generatedAt: string | null = null;
-  let bron: string | null = null;
+  let generatedAt: string | null = overzicht.generatedAt ?? null;
+  let bron: string | null = overzicht.sourceFile ?? null;
   let offset = 0;
+  let paginering = true;
 
   for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
-    const { ok, status, data } = await backendJson<LocatieAntwoord>(
-      `api/admin/voorraad-locaties?branchId=${encodeURIComponent(branchId)}&limit=${PAGINA}&offset=${offset}`,
-      { method: "GET" },
-      true
+    const data = await vraagStoregents(
+      `?store=${encodeURIComponent(filiaal.store)}` +
+        `&branchId=${encodeURIComponent(branchId)}` +
+        `&limit=${PAGINA}&offset=${offset}`
     );
-
-    if (!ok || !data?.success) {
-      throw new BoekingsFout(
-        data?.message || `storegents gaf status ${status} op de locatie-opvraag.`,
-        "backend_fout"
-      );
-    }
 
     generatedAt = data.generatedAt ?? generatedAt;
     bron = data.sourceFile ?? bron;
 
-    const pagina_rijen = Array.isArray(data.rows) ? data.rows : [];
-    rijen.push(...pagina_rijen);
+    const paginaRijen = Array.isArray(data.rows) ? data.rows : [];
+    rijen.push(...paginaRijen.filter((r) => String(r.filiaalNummer) === branchId));
 
-    if (!data.truncated) break;
+    if (!data.truncated || paginaRijen.length === 0) break;
 
+    /* Een oudere versie kapt af zonder offset te kennen. Doorvragen zou dan
+       eindeloos dezelfde eerste pagina opleveren. */
     if (typeof data.offset !== "number") {
-      throw new BoekingsFout(
-        `storegents kapt af op ${pagina_rijen.length} regels en ondersteunt nog geen paginering. ` +
-          "Deploy de aanpassing op /api/admin/voorraad-locaties eerst — anders zou het WMS een onvolledige voorraad importeren.",
-        "geen_paginering"
-      );
+      paginering = false;
+      break;
     }
 
-    offset += pagina_rijen.length;
-    if (pagina_rijen.length === 0) break;
+    offset += paginaRijen.length;
   }
 
-  return { rijen, generatedAt, bron };
+  const volledig = paginering && rijen.length >= filiaal.locaties;
+
+  return {
+    rijen,
+    generatedAt,
+    bron,
+    verwachteRegels: filiaal.locaties,
+    verwachteStuks: filiaal.totalAantal,
+    store: filiaal.store,
+    volledig,
+  };
 }
 
 /* ── Importeren ────────────────────────────────────────────────────────────── */
@@ -151,11 +224,23 @@ export async function importeerSrsLocaties(
     );
   }
 
-  const { rijen, generatedAt, bron } = await haalSrsLocaties(branchId);
+  const { rijen, generatedAt, bron, verwachteRegels, volledig } =
+    await haalSrsLocaties(branchId);
+
   if (rijen.length === 0) {
     throw new BoekingsFout(
-      `SRS kent geen locatieregels voor filiaal ${branchId}.`,
+      `SRS kent ${verwachteRegels} locatieregels voor filiaal ${branchId}, maar er kwam er niet één door. Controleer /api/admin/voorraad-locaties in storegents.`,
       "geen_data"
+    );
+  }
+
+  /* Half importeren is erger dan niet importeren: de totalen kloppen dan niet
+     en niemand ziet waarom. Liever weigeren met een aanwijzing. */
+  if (!volledig) {
+    throw new BoekingsFout(
+      `Er kwamen ${rijen.length} van de ${verwachteRegels} locatieregels door — storegents kapt af zonder paginering. ` +
+        "Merge en deploy storegents#416 eerst; anders zou het WMS een onvolledige voorraad boeken.",
+      "onvolledig"
     );
   }
 

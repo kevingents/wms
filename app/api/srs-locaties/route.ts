@@ -13,18 +13,29 @@ export async function GET() {
   if (!sessie.ok) return sessie.response;
 
   try {
-    const { rijen, generatedAt, bron } = await haalSrsLocaties("99");
+    const bronData = await haalSrsLocaties("99");
+    const { rijen, generatedAt, bron, verwachteRegels, verwachteStuks, volledig } = bronData;
     const codes = new Set(rijen.map((r) => r.locatie.trim().toUpperCase()).filter(Boolean));
     const skus = new Set(rijen.map((r) => r.sku.trim()).filter(Boolean));
+
     return NextResponse.json({
       ok: true,
       generatedAt,
       bron,
+      store: bronData.store,
       regels: rijen.length,
       locaties: codes.size,
       skus: skus.size,
       stuks: rijen.reduce((s, r) => s + Number(r.aantal || 0), 0),
       geblokkeerd: rijen.filter((r) => r.geblokkeerd).length,
+      /* Wat SRS zégt te hebben, naast wat er doorkwam. Verschilt dat, dan ligt
+         het aan het endpoint en niet aan de data — dat scheelt zoekwerk. */
+      verwachteRegels,
+      verwachteStuks,
+      volledig,
+      waarschuwing: volledig
+        ? null
+        : `Er kwamen ${rijen.length} van de ${verwachteRegels} regels door. storegents kapt af zonder paginering — merge en deploy storegents#416.`,
       alGeladen: await beginvoorraadGeladen(),
     });
   } catch (err) {

@@ -58,6 +58,9 @@ export function InslagView({
     stuks: number;
     geblokkeerd: number;
     generatedAt: string | null;
+    verwachteRegels: number;
+    volledig: boolean;
+    waarschuwing: string | null;
   } | null>(null);
   const [srsFout, setSrsFout] = useState("");
   const [srsGekeken, setSrsGekeken] = useState(false);
@@ -273,7 +276,8 @@ export function InslagView({
                   toelichting={`${srs.skus.toLocaleString("nl-NL")} sku's`}
                 />
               </div>
-              {srs.stuks < voorbeeld.stuks && (
+              {srs.waarschuwing && <Melding soort="bad">{srs.waarschuwing}</Melding>}
+              {srs.volledig && srs.stuks < voorbeeld.stuks && (
                 <Melding soort="warn">
                   SRS meldt {voorbeeld.stuks.toLocaleString("nl-NL")} stuks voorraad maar
                   heeft er maar {srs.stuks.toLocaleString("nl-NL")} op een vak staan. Het
@@ -282,7 +286,11 @@ export function InslagView({
                 </Melding>
               )}
               {!bevestigSrs ? (
-                <Knop className="mt-3 w-full" onClick={() => setBevestigSrs(true)}>
+                <Knop
+                  className="mt-3 w-full"
+                  onClick={() => setBevestigSrs(true)}
+                  disabled={!srs.volledig}
+                >
                   Locaties en voorraad overnemen
                 </Knop>
               ) : (
