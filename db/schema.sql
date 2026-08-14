@@ -291,7 +291,9 @@ CREATE TABLE IF NOT EXISTS wms.pick_orders (
   started_at      timestamptz,
   finished_at     timestamptz,
   UNIQUE (bron, bron_ref),
-  CONSTRAINT pick_orders_bron_chk CHECK (bron IN ('weborder', 'transfer', 'handmatig')),
+  CONSTRAINT pick_orders_bron_chk CHECK (
+    bron IN ('weborder', 'transfer', 'aanvulling', 'handmatig')
+  ),
   CONSTRAINT pick_orders_status_chk CHECK (
     status IN ('open', 'bezig', 'gepikt', 'afgesloten', 'geannuleerd')
   )
@@ -299,6 +301,52 @@ CREATE TABLE IF NOT EXISTS wms.pick_orders (
 --;;
 CREATE INDEX IF NOT EXISTS idx_pick_orders_werkvoorraad
   ON wms.pick_orders (prioriteit DESC, created_at) WHERE status IN ('open', 'bezig')
+--;;
+
+-- De portal is het brein, het WMS zijn de handen. Elk rekenmodel in de portal —
+-- herverdeling, replenishment, forecast — levert werk af via dezelfde deur; het
+-- WMS bewaart alleen wáár het vandaan komt. Nieuwe bronnen erbij is één woord
+-- in deze lijst, geen nieuwe koppeling.
+--
+-- Losse DROP/ADD omdat CREATE TABLE IF NOT EXISTS de constraint niet bijwerkt
+-- als de tabel al bestaat.
+ALTER TABLE wms.pick_orders DROP CONSTRAINT IF EXISTS pick_orders_bron_chk
+--;;
+ALTER TABLE wms.pick_orders ADD CONSTRAINT pick_orders_bron_chk
+  CHECK (bron IN ('weborder', 'transfer', 'aanvulling', 'herverdeling',
+                  'forecast', 'inkoop', 'handmatig'))
+--;;
+
+-- Waar het WMS terugmeldt wat er met deze opdracht gebeurd is. Per opdracht,
+-- want verschillende rekenmodellen in de portal willen hun eigen antwoord terug.
+ALTER TABLE wms.pick_orders ADD COLUMN IF NOT EXISTS callback_url text
+--;;
+ALTER TABLE wms.pick_orders ADD COLUMN IF NOT EXISTS bron_payload jsonb
+--;;
+
+-- ── Terugkoppeling naar de portal ───────────────────────────────────────────
+-- Een uitgaande wachtrij, geen directe HTTP-call vanuit de boeking. Als de
+-- portal even niet bereikbaar is mag dat de magazijnvloer niet stilleggen: de
+-- gebeurtenis staat vast, de bezorging volgt. Zelfde principe als de outbox in
+-- de scan-app, een niveau hoger.
+CREATE TABLE IF NOT EXISTS wms.koppeling_uitgaand (
+  id            bigserial PRIMARY KEY,
+  soort         text NOT NULL,
+  pick_order_id bigint REFERENCES wms.pick_orders (id) ON DELETE SET NULL,
+  doel_url      text,
+  payload       jsonb NOT NULL,
+  status        text NOT NULL DEFAULT 'wachtend',
+  pogingen      integer NOT NULL DEFAULT 0,
+  laatste_fout  text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  verzonden_at  timestamptz,
+  CONSTRAINT koppeling_status_chk CHECK (
+    status IN ('wachtend', 'verzonden', 'mislukt', 'overgeslagen')
+  )
+)
+--;;
+CREATE INDEX IF NOT EXISTS idx_koppeling_wachtend
+  ON wms.koppeling_uitgaand (created_at) WHERE status = 'wachtend'
 --;;
 
 -- Eén regel per (sku × locatie). Ligt een artikel op twee locaties en heb je er

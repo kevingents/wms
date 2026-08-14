@@ -33,6 +33,12 @@ if (!process.env.DATABASE_URL) {
 
 const sql = neon(process.env.DATABASE_URL);
 const SKU = "ZZ-TEST-SKU";
+
+/* Eigen kenmerk per run: het grootboek is append-only, dus boekingen van een
+   vorige run blijven staan. Zonder dit botst de idempotency-sleutel de tweede
+   keer dat je de test draait. */
+const RUN = `ZZ-TEST-${Date.now().toString(36)}`;
+
 let mislukt = 0;
 
 function check(naam, geslaagd, detail = "") {
@@ -76,7 +82,7 @@ check("vrije voorraad is 10 zonder open picks", Number((await vrij()).vrij) === 
 /* Pickopdracht 1: 6 stuks toegewezen aan A. */
 const [order1] = await sql`
   INSERT INTO wms.pick_orders (code, bron, bron_ref, bestemming)
-  VALUES ('ZZ-P-1', 'handmatig', 'ZZ-TEST-1', 'Test') RETURNING id`;
+  VALUES (${`ZZ-P-1-${RUN}`}, 'handmatig', ${`${RUN}-1`}, 'Test') RETURNING id`;
 const [regel1] = await sql`
   INSERT INTO wms.pick_lines (pick_order_id, sku, gevraagd, location_id, volgorde)
   VALUES (${order1.id}, ${SKU}, 6, ${A}, 9000) RETURNING id`;
@@ -101,7 +107,7 @@ check("meer picken dan gevraagd wordt geweigerd", teVeelGeweigerd);
 /* Import-idempotentie: dezelfde bron + referentie levert geen tweede opdracht. */
 const dubbel = await sql`
   INSERT INTO wms.pick_orders (code, bron, bron_ref, bestemming)
-  VALUES ('ZZ-P-1b', 'handmatig', 'ZZ-TEST-1', 'Test')
+  VALUES (${`ZZ-P-1b-${RUN}`}, 'handmatig', ${`${RUN}-1`}, 'Test')
   ON CONFLICT (bron, bron_ref) DO NOTHING RETURNING id`;
 check("tweede import van dezelfde bron levert geen opdracht", dubbel.length === 0);
 
@@ -109,7 +115,7 @@ check("tweede import van dezelfde bron levert geen opdracht", dubbel.length === 
 await sql`
   INSERT INTO wms.stock_moves
     (sku, from_location_id, to_location_id, qty, reason, ref_type, ref_id, actor_name)
-  VALUES (${SKU}, ${A}, ${EXP}, 6, 'pick', 'pickopdracht', 'ZZ-P-1', 'smoke-picken')`;
+  VALUES (${SKU}, ${A}, ${EXP}, 6, 'pick', 'pickopdracht', ${`ZZ-P-1-${RUN}`}, 'smoke-picken')`;
 await sql`
   UPDATE wms.pick_lines SET gepikt = 6, status = 'gepikt', afgerond_at = now()
    WHERE id = ${regel1.id}`;
@@ -136,7 +142,7 @@ await sql`
   INSERT INTO wms.stock_moves
     (sku, from_location_id, qty, reason, ref_type, ref_id, actor_name, idempotency_key)
   VALUES (${SKU}, ${EXP}, 6, 'verzonden', 'pickopdracht', 'ZZ-P-1', 'smoke-picken',
-          'ZZ-TEST-verzend-1')`;
+          ${`${RUN}-verzend`})`;
 const [naVerzending] = await sql`
   SELECT qty FROM wms.stock_levels WHERE sku = ${SKU} AND location_id = ${EXP}`;
 check("verzenden maakt expeditie leeg", Number(naVerzending?.qty ?? 0) === 0);
@@ -147,11 +153,60 @@ try {
   await sql`
     INSERT INTO wms.stock_moves
       (sku, from_location_id, qty, reason, actor_name, idempotency_key)
-    VALUES (${SKU}, ${EXP}, 6, 'verzonden', 'smoke-picken', 'ZZ-TEST-verzend-1')`;
+    VALUES (${SKU}, ${EXP}, 6, 'verzonden', 'smoke-picken', ${`${RUN}-verzend`})`;
 } catch (err) {
   dubbelVerzendGeweigerd = String(err?.code) === "23505";
 }
 check("tweede verzendboeking met dezelfde sleutel wordt geweigerd", dubbelVerzendGeweigerd);
+
+/* ── Koppeling met de portal ──────────────────────────────────────────────── */
+
+/* Elk rekenmodel uit de portal moet door dezelfde deur passen. */
+let bronnenOk = true;
+for (const bron of ["herverdeling", "forecast", "aanvulling", "inkoop"]) {
+  try {
+    await sql`
+      INSERT INTO wms.pick_orders (code, bron, bron_ref, bestemming)
+      VALUES (${`ZZ-P-${bron}-${RUN}`}, ${bron}, ${`${RUN}-${bron}`}, 'Test')`;
+  } catch {
+    bronnenOk = false;
+  }
+}
+check("portal-bronnen (herverdeling/forecast/aanvulling/inkoop) toegestaan", bronnenOk);
+
+let onzinGeweigerd = false;
+try {
+  await sql`
+    INSERT INTO wms.pick_orders (code, bron, bron_ref)
+    VALUES (${`ZZ-P-onzin-${RUN}`}, 'onzin', ${`${RUN}-onzin`})`;
+} catch (err) {
+  onzinGeweigerd = /pick_orders_bron_chk/.test(String(err?.message));
+}
+check("onbekende bron wordt geweigerd", onzinGeweigerd);
+
+/* Terugmelding zonder callback wordt bewaard maar niet verstuurd — het spoor
+   blijft compleet, ook als de portal niets terug wil. */
+const [metCallback] = await sql`
+  SELECT id FROM wms.pick_orders WHERE bron_ref = ${`${RUN}-herverdeling`}`;
+await sql`
+  INSERT INTO wms.koppeling_uitgaand (soort, pick_order_id, doel_url, payload, status)
+  VALUES ('verzonden', ${metCallback.id}, NULL, '{"test":true}'::jsonb, 'overgeslagen')`;
+const [zonderDoel] = await sql`
+  SELECT count(*)::int AS n FROM wms.koppeling_uitgaand
+   WHERE pick_order_id = ${metCallback.id} AND status = 'overgeslagen'`;
+check("terugmelding zonder callback wordt bewaard, niet verstuurd", zonderDoel.n === 1);
+
+let onzinStatusGeweigerd = false;
+try {
+  await sql`
+    INSERT INTO wms.koppeling_uitgaand (soort, payload, status)
+    VALUES ('verzonden', '{}'::jsonb, 'zomaarwat')`;
+} catch (err) {
+  onzinStatusGeweigerd = /koppeling_status_chk/.test(String(err?.message));
+}
+check("onbekende koppelingsstatus wordt geweigerd", onzinStatusGeweigerd);
+
+await sql`DELETE FROM wms.koppeling_uitgaand WHERE payload::text LIKE '%"test":true%'`;
 
 /* Opruimen: opdrachten weg, saldi weg, testlocatie inactief. Het grootboek
    blijft — dat is append-only en dat is precies de bedoeling. */

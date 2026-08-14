@@ -7,7 +7,14 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
  * sessiecheck kost geen function-invocatie.
  */
 
-const OPEN_PADEN = [/^\/login/, /^\/api\/auth\//, /^\/api\/cron\//];
+/* `/api/koppeling/*` heeft géén gebruikerssessie maar een gedeeld geheim: dat
+   is server-naar-server verkeer vanuit de portal. De route bewaakt zichzelf. */
+const OPEN_PADEN = [
+  /^\/login/,
+  /^\/api\/auth\//,
+  /^\/api\/cron\//,
+  /^\/api\/koppeling\//,
+];
 
 export async function middleware(req: NextRequest) {
   const pad = req.nextUrl.pathname;

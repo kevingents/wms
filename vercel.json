@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/srs-vergelijking",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/koppeling",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

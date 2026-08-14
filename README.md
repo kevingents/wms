@@ -68,6 +68,24 @@ npm run db:smoke
 | `node scripts/db-inspect.mjs` | Read-only: welke schema's en tabellen staan er |
 | `node scripts/db-verkennen.mjs` | Read-only: vorm van de bestaande voorraaddata |
 
+## Portal ↔ WMS
+
+**De portal is het brein, het WMS zijn de handen.** Herverdeling, replenishment,
+forecast en inkoop bepalen in de portal wát er moet gebeuren — op basis van
+verkoopsnelheid, ideaalvoorraad, seizoen en marge, dingen die het WMS niet weet
+en niet hoeft te weten. Het WMS weet waar het ligt, of het nog vrij is, pakt het
+en meldt terug wat er echt gebeurd is.
+
+Alle rekenmodellen leveren werk af via **één deur** met dezelfde vorm; een nieuw
+model vraagt geen nieuwe koppeling, alleen een andere `bron`. Zie
+[docs/KOPPELING.md](docs/KOPPELING.md) voor het contract.
+
+Wat het WMS wél zelf beantwoordt is de vraag die alleen het WMS kán beantwoorden:
+hoeveel van de keten-tekorten ligt hier vrij, ná aftrek van wat al aan lopende
+pickopdrachten is toegezegd (`GET /api/koppeling/dekking`). SRS weet dat laatste
+niet, en zonder die correctie belooft een adviesmodel dezelfde stuks aan twee
+winkels.
+
 ## Verhouding tot de rest
 
 ```

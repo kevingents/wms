@@ -22,10 +22,24 @@ import { instelling } from "./instellingen";
  * de rest opnieuw toe.
  */
 
+/**
+ * Waar het werk vandaan komt. De portal-modellen (herverdeling, forecast,
+ * aanvulling, inkoop) leveren allemaal via dezelfde deur af; alleen dit label
+ * verschilt. Houd deze lijst gelijk aan pick_orders_bron_chk in db/schema.sql.
+ */
+export type PickBron =
+  | "weborder"
+  | "transfer"
+  | "aanvulling"
+  | "herverdeling"
+  | "forecast"
+  | "inkoop"
+  | "handmatig";
+
 export interface PickOpdracht {
   id: number;
   code: string;
-  bron: "weborder" | "transfer" | "handmatig";
+  bron: PickBron;
   bron_ref: string;
   bestemming: string | null;
   prioriteit: number;
@@ -289,7 +303,7 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
  * import herhaalbaar zonder dubbel werk.
  */
 export async function maakPickOpdracht(args: {
-  bron: "weborder" | "transfer" | "handmatig";
+  bron: PickBron;
   bronRef: string;
   bestemming?: string | null;
   prioriteit?: number;
@@ -497,9 +511,14 @@ export async function slaRegelOver(regelId: number, reden: string): Promise<void
   if (regel) await werkOpdrachtStatusBij(regel.pick_order_id);
 }
 
-/** Alle regels af → opdracht op 'gepikt'. Geen open regels meer betekent klaar. */
+/**
+ * Alle regels af → opdracht op 'gepikt'. Geen open regels meer betekent klaar.
+ * Bij die overgang gaat er een terugmelding naar de portal: het model dat om
+ * deze ronde vroeg wil weten wat er daadwerkelijk gepikt is, niet alleen wat
+ * het gevraagd had.
+ */
 async function werkOpdrachtStatusBij(pickOrderId: number): Promise<void> {
-  await query(
+  const afgerond = await queryOne<{ id: number }>(
     `UPDATE wms.pick_orders o
         SET status = 'gepikt', finished_at = now()
       WHERE o.id = $1
@@ -507,9 +526,21 @@ async function werkOpdrachtStatusBij(pickOrderId: number): Promise<void> {
         AND NOT EXISTS (
           SELECT 1 FROM wms.pick_lines l
            WHERE l.pick_order_id = o.id AND l.status = 'open'
-        )`,
+        )
+      RETURNING o.id`,
     [pickOrderId]
   );
+
+  if (afgerond) {
+    /* Late import: koppeling.ts leest picken.ts, dus statisch zou dit een
+       cirkel zijn. De terugmelding mag de boeking bovendien nooit laten falen. */
+    try {
+      const { meldTerug } = await import("./koppeling");
+      await meldTerug({ soort: "gepikt", pickOrderId });
+    } catch {
+      /* Terugmelden is bijzaak; het grootboek klopt sowieso. */
+    }
+  }
 }
 
 /**
@@ -563,5 +594,13 @@ export async function verzendPickOpdracht(args: {
       WHERE id = $1`,
     [args.id]
   );
+
+  try {
+    const { meldTerug } = await import("./koppeling");
+    await meldTerug({ soort: "verzonden", pickOrderId: args.id });
+  } catch {
+    /* Zie werkOpdrachtStatusBij: terugmelden mag de boeking niet blokkeren. */
+  }
+
   return pickOpdracht(args.id);
 }

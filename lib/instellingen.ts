@@ -19,7 +19,14 @@ export interface InstellingDefinitie {
   label: string;
   uitleg: string;
   type: InstellingType;
-  groep: "Magazijn" | "Inslag" | "Picken" | "Tellen" | "Shadow-fase" | "Scannen";
+  groep:
+    | "Magazijn"
+    | "Inslag"
+    | "Picken"
+    | "Aanvullen"
+    | "Tellen"
+    | "Shadow-fase"
+    | "Scannen";
   standaard: unknown;
 }
 
@@ -94,6 +101,15 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
     type: "schakelaar",
     groep: "Picken",
     standaard: true,
+  },
+  {
+    key: "aanvullen.minimum_per_regel",
+    label: "Minimum per aanvulregel",
+    uitleg:
+      "Regels waar minder dan dit aantal aan toegewezen wordt, komen niet op de looplijst. Voorkomt rondes waarin je voor losse stuks het hele magazijn doorloopt.",
+    type: "getal",
+    groep: "Aanvullen",
+    standaard: 1,
   },
   {
     key: "tellen.verschil_drempel",
