@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { vereisSessie, vereisBeheer } from "@/lib/auth-server";
 import { alleInstellingen, zetInstelling, INSTELLINGEN } from "@/lib/instellingen";
+import { legVast } from "@/lib/kpi";
 
 export const runtime = "nodejs";
 
@@ -33,9 +34,22 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Niets te wijzigen." }, { status: 400 });
   }
 
+  /* Vóór het wijzigen vastleggen wat er stond — anders is "het stond gisteren
+     anders" straks niet te beantwoorden. */
+  const oud = await alleInstellingen();
+
   try {
     for (const key of namen) {
       await zetInstelling(key, wijzigingen[key], sessie.user.name);
+      await legVast({
+        actorId: sessie.user.userId,
+        actorNaam: sessie.user.name,
+        actie: "instelling gewijzigd",
+        objectType: "instelling",
+        objectId: key,
+        oud: oud[key],
+        nieuw: wijzigingen[key],
+      });
     }
   } catch (err) {
     return NextResponse.json(

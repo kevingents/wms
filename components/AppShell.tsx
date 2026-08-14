@@ -14,15 +14,21 @@ import { cn } from "@/lib/cn";
 /* Op de handterminal is /terminal het startscherm; op een bureaublad /. Beide
    staan in het menu zodat je er altijd uit kunt. */
 const MENU: { pad: string; label: string; icon: IconName }[] = [
+  /* De eerste vijf zijn wat er in de onderbalk van een handterminal past. */
   { pad: "/terminal", label: "Terminal", icon: "terminal" },
   { pad: "/rondes", label: "Rondes", icon: "kar" },
-  { pad: "/picken", label: "Picken", icon: "pick" },
-  { pad: "/inslag", label: "Inslag", icon: "inslag" },
+  { pad: "/inpakken", label: "Inpakken", icon: "box" },
+  { pad: "/taken", label: "Taken", icon: "taken" },
   { pad: "/scan", label: "Scannen", icon: "scan" },
-  { pad: "/voorraad", label: "Voorraad", icon: "box" },
+  { pad: "/picken", label: "Picken", icon: "pick" },
+  { pad: "/ontvangst", label: "Ontvangst", icon: "inslag" },
+  { pad: "/retouren", label: "Retouren", icon: "retour" },
+  { pad: "/inslag", label: "Inslag", icon: "inslag" },
   { pad: "/tellen", label: "Tellen", icon: "tellen" },
-  { pad: "/", label: "Overzicht", icon: "dashboard" },
+  { pad: "/voorraad", label: "Voorraad", icon: "zoek" },
   { pad: "/locaties", label: "Locaties", icon: "locatie" },
+  { pad: "/", label: "Overzicht", icon: "dashboard" },
+  { pad: "/kpi", label: "Cijfers", icon: "grafiek" },
   { pad: "/shadow", label: "SRS-check", icon: "synchroniseer" },
 ];
 

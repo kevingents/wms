@@ -10,6 +10,10 @@
     {
       "path": "/api/cron/koppeling",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/werkplanning",
+      "schedule": "0 6 * * 1-6"
     }
   ]
 }

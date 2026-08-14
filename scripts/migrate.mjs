@@ -51,26 +51,33 @@ async function laadEnvLocal() {
 await laadEnvLocal();
 
 const sql = neon(dbUrl());
-const bestand = await readFile(join(hier, "..", "db", "schema.sql"), "utf8");
 
-const statements = bestand
-  .split(/^\s*--;;\s*$/m)
-  .map((s) => s.replace(/^[ \t]*--[^\n]*\n?/gm, "").trim())
-  .filter(Boolean);
+/* Volgorde telt: schema-2 verwijst naar tabellen en views uit schema.sql. */
+const BESTANDEN = ["schema.sql", "schema-2.sql"];
 
-console.log(`Migreren: ${statements.length} statements…`);
+let totaal = 0;
 
-let n = 0;
-for (const statement of statements) {
-  const kop = statement.split("\n")[0].slice(0, 72);
-  try {
-    await sql.query(statement);
-    n += 1;
-    console.log(`  ok   ${kop}`);
-  } catch (err) {
-    console.error(`  FOUT ${kop}\n       ${err?.message || err}`);
-    process.exit(1);
+for (const naam of BESTANDEN) {
+  const bestand = await readFile(join(hier, "..", "db", naam), "utf8");
+
+  const statements = bestand
+    .split(/^\s*--;;\s*$/m)
+    .map((s) => s.replace(/^[ \t]*--[^\n]*\n?/gm, "").trim())
+    .filter(Boolean);
+
+  console.log(`\n${naam} — ${statements.length} statements`);
+
+  for (const statement of statements) {
+    const kop = statement.split("\n")[0].slice(0, 72);
+    try {
+      await sql.query(statement);
+      totaal += 1;
+      console.log(`  ok   ${kop}`);
+    } catch (err) {
+      console.error(`  FOUT ${kop}\n       ${err?.message || err}`);
+      process.exit(1);
+    }
   }
 }
 
-console.log(`Klaar — ${n} statements uitgevoerd.`);
+console.log(`\nKlaar — ${totaal} statements uitgevoerd.`);

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { kerncijfers } from "@/lib/voorraad";
 import { werkvoorraad } from "@/lib/picken";
 import { openRondes } from "@/lib/rondes";
-import { indeelVoortgang } from "@/lib/inslag";
+import { werkstand } from "@/lib/kpi";
 import { huidigeGebruiker } from "@/lib/auth-server";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
@@ -24,30 +24,35 @@ const TEGELS: {
   omschrijving: string;
 }[] = [
   { pad: "/rondes", label: "Rondes", icon: "kar", omschrijving: "Batch met bakken" },
-  { pad: "/picken", label: "Picken", icon: "pick", omschrijving: "Losse order" },
-  { pad: "/inslag", label: "Inslag", icon: "inslag", omschrijving: "Voorraad inboeken" },
+  { pad: "/inpakken", label: "Inpakken", icon: "box", omschrijving: "Doos dicht" },
+  { pad: "/ontvangst", label: "Ontvangst", icon: "inslag", omschrijving: "Levering uitpakken" },
+  { pad: "/retouren", label: "Retouren", icon: "retour", omschrijving: "Aannemen, beoordelen" },
+  { pad: "/taken", label: "Taken", icon: "taken", omschrijving: "Aanvullen, tellen" },
   { pad: "/scan", label: "Verplaatsen", icon: "scan", omschrijving: "Tussen vakken" },
-  { pad: "/tellen", label: "Tellen", icon: "tellen", omschrijving: "Locatie controleren" },
   { pad: "/voorraad", label: "Zoeken", icon: "zoek", omschrijving: "Waar ligt het?" },
-  { pad: "/locaties", label: "Locaties", icon: "locatie", omschrijving: "Vakken beheren" },
+  { pad: "/picken", label: "Losse pick", icon: "pick", omschrijving: "Eén order" },
 ];
 
 export default async function TerminalPagina() {
-  const [cijfers, opdrachten, rondes, voortgang, user] = await Promise.all([
+  const [cijfers, opdrachten, rondes, stand, user] = await Promise.all([
     kerncijfers(),
     werkvoorraad(),
     openRondes(),
-    indeelVoortgang(),
+    werkstand(),
     huidigeGebruiker(),
   ]);
 
+  /* Alleen tellen wat er écht ligt te wachten — een tegel met een 0 erop leidt
+     alleen maar af. */
+  const teller = (n: number) => (n > 0 ? String(n) : null);
+
   const tellers: Record<string, string | null> = {
-    "/rondes": rondes.length > 0 ? String(rondes.length) : null,
-    "/picken": opdrachten.length > 0 ? String(opdrachten.length) : null,
-    "/inslag":
-      voortgang.wachtend_stuks > 0
-        ? voortgang.wachtend_stuks.toLocaleString("nl-NL")
-        : null,
+    "/rondes": teller(rondes.length),
+    "/inpakken": teller(stand.zending_open),
+    "/ontvangst": teller(stand.ontvangst_open),
+    "/retouren": teller(stand.retour_open),
+    "/taken": teller(stand.taken_open),
+    "/picken": teller(opdrachten.length),
   };
 
   return (

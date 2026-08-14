@@ -23,6 +23,7 @@ export interface InstellingDefinitie {
     | "Magazijn"
     | "Inslag"
     | "Picken"
+    | "Inpakken"
     | "Aanvullen"
     | "Tellen"
     | "Shadow-fase"
@@ -110,6 +111,32 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
     type: "schakelaar",
     groep: "Picken",
     standaard: true,
+  },
+  {
+    key: "inpakken.controle_verplicht",
+    label: "Scan-controle bij inpakken",
+    uitleg:
+      "Dwingt de inpakker elk artikel te scannen voordat de doos dicht mag. Dit is de laatste kans om een mispick te vangen; wie het uitzet, betaalt het terug in retouren.",
+    type: "schakelaar",
+    groep: "Inpakken",
+    standaard: true,
+  },
+  {
+    key: "inpakken.standaard_vervoerder",
+    label: "Standaard vervoerder",
+    uitleg: "Wordt voorgevuld bij het inpakken. Per zending nog aan te passen.",
+    type: "tekst",
+    groep: "Inpakken",
+    standaard: "DHL",
+  },
+  {
+    key: "tellen.per_dag",
+    label: "Cyclustellingen per dag",
+    uitleg:
+      "Hoeveel vakken er dagelijks automatisch ingepland worden om te tellen. Drukke vakken komen vaker aan de beurt dan stille.",
+    type: "getal",
+    groep: "Tellen",
+    standaard: 10,
   },
   {
     key: "aanvullen.minimum_per_regel",

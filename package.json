@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/migrate.mjs",
-    "db:smoke": "node scripts/smoke.mjs && node scripts/smoke-picken.mjs && node scripts/smoke-rondes.mjs",
+    "db:smoke": "node scripts/smoke.mjs && node scripts/smoke-picken.mjs && node scripts/smoke-rondes.mjs && node scripts/smoke-keten.mjs",
+    "db:opruimen": "node scripts/db-testdata-opruimen.mjs",
     "db:status": "node scripts/db-status.mjs"
   },
   "dependencies": {
