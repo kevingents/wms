@@ -266,6 +266,117 @@ CREATE INDEX IF NOT EXISTS idx_count_lines_verschil
   ON wms.count_lines (count_id) WHERE verschil <> 0
 --;;
 
+-- ── Picken ──────────────────────────────────────────────────────────────────
+-- Waar het pickwerk vandaan komt (zie lib/picken.ts):
+--   weborder — public.orders.fulfillment_plan bevat shipments[] met branchId;
+--              alles met branchId '99' / isWarehouse is magazijnwerk.
+--   transfer — public.inbound_shipments met from_location = magazijn.
+--   handmatig— door een teamleider aangemaakt.
+--
+-- UNIQUE (bron, bron_ref) maakt de import idempotent: dezelfde order twee keer
+-- importeren levert geen tweede pickopdracht op.
+CREATE TABLE IF NOT EXISTS wms.pick_orders (
+  id              bigserial PRIMARY KEY,
+  code            text NOT NULL UNIQUE,
+  bron            text NOT NULL,
+  bron_ref        text NOT NULL,
+  bestemming      text,
+  prioriteit      integer NOT NULL DEFAULT 0,
+  status          text NOT NULL DEFAULT 'open',
+  toegewezen_aan  text,
+  toegewezen_naam text,
+  aangemaakt_door text,
+  note            text,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  started_at      timestamptz,
+  finished_at     timestamptz,
+  UNIQUE (bron, bron_ref),
+  CONSTRAINT pick_orders_bron_chk CHECK (bron IN ('weborder', 'transfer', 'handmatig')),
+  CONSTRAINT pick_orders_status_chk CHECK (
+    status IN ('open', 'bezig', 'gepikt', 'afgesloten', 'geannuleerd')
+  )
+)
+--;;
+CREATE INDEX IF NOT EXISTS idx_pick_orders_werkvoorraad
+  ON wms.pick_orders (prioriteit DESC, created_at) WHERE status IN ('open', 'bezig')
+--;;
+
+-- Eén regel per (sku × locatie). Ligt een artikel op twee locaties en heb je er
+-- meer nodig dan er op één ligt, dan ontstaan er twee regels — de picker loopt
+-- ze allebei langs. `volgorde` is gekopieerd van de locatie zodat de lijst in
+-- looprichting staat.
+--
+-- `location_id` is een TOEWIJZING, geen reservering: de voorraad blijft gewoon
+-- op zijn plek tot er echt gepikt wordt. Ligt het er onverhoopt niet, dan meldt
+-- de picker 'kort' en wijst het systeem opnieuw toe. Dat is bewust — een echte
+-- reservering met tegenboekingen kost meer dan het hier oplevert.
+CREATE TABLE IF NOT EXISTS wms.pick_lines (
+  id            bigserial PRIMARY KEY,
+  pick_order_id bigint NOT NULL REFERENCES wms.pick_orders (id) ON DELETE CASCADE,
+  sku           text NOT NULL,
+  gevraagd      integer NOT NULL,
+  gepikt        integer NOT NULL DEFAULT 0,
+  location_id   bigint REFERENCES wms.locations (id),
+  volgorde      integer NOT NULL DEFAULT 0,
+  status        text NOT NULL DEFAULT 'open',
+  move_id       bigint REFERENCES wms.stock_moves (id),
+  note          text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  afgerond_at   timestamptz,
+  CONSTRAINT pick_lines_gevraagd_chk CHECK (gevraagd > 0),
+  CONSTRAINT pick_lines_gepikt_chk CHECK (gepikt >= 0 AND gepikt <= gevraagd),
+  CONSTRAINT pick_lines_status_chk CHECK (
+    status IN ('open', 'gepikt', 'kort', 'overgeslagen')
+  )
+)
+--;;
+CREATE INDEX IF NOT EXISTS idx_pick_lines_order
+  ON wms.pick_lines (pick_order_id, volgorde, id)
+--;;
+CREATE INDEX IF NOT EXISTS idx_pick_lines_open
+  ON wms.pick_lines (sku, location_id) WHERE status = 'open'
+--;;
+
+-- Hoeveel van een sku op een locatie al is toegezegd aan openstaande picks.
+-- Hiermee stuurt de toewijzing niet twee pickers naar dezelfde vier stuks.
+CREATE OR REPLACE VIEW wms.toegewezen AS
+SELECT sku, location_id, sum(gevraagd - gepikt)::int AS toegewezen
+  FROM wms.pick_lines
+ WHERE status = 'open' AND location_id IS NOT NULL
+ GROUP BY sku, location_id
+--;;
+
+-- Vrije voorraad per locatie: wat er ligt minus wat al is toegezegd. Dít is
+-- waar de toewijzing uit put.
+CREATE OR REPLACE VIEW wms.vrije_voorraad AS
+SELECT s.sku,
+       s.location_id,
+       l.code                AS location_code,
+       l.sort_order,
+       l.pickable,
+       l.kind,
+       s.qty                 AS aanwezig,
+       coalesce(t.toegewezen, 0) AS toegewezen,
+       s.qty - coalesce(t.toegewezen, 0) AS vrij
+  FROM wms.stock_levels s
+  JOIN wms.locations l ON l.id = s.location_id
+  LEFT JOIN wms.toegewezen t ON t.sku = s.sku AND t.location_id = s.location_id
+ WHERE s.qty > 0 AND l.active
+--;;
+
+-- Standaard-expeditielocatie. Gepikte goederen gaan hierheen en blijven in het
+-- grootboek staan tot ze daadwerkelijk verzonden worden — zo is een doos die op
+-- de kade staat nog steeds vindbaar. De code is instelbaar via /instellingen.
+INSERT INTO wms.locations (code, name, zone, kind, sort_order, pickable)
+VALUES ('EXPEDITIE', 'Expeditie / uitgaand', 'EXPEDITIE', 'outbound', 9999, false)
+ON CONFLICT (code) DO NOTHING
+--;;
+
+-- Teller voor picknummers (P-000001). Een sequence i.p.v. max()+1, want dat
+-- laatste geeft dubbele nummers zodra twee mensen tegelijk importeren.
+CREATE SEQUENCE IF NOT EXISTS wms.pick_order_nummer START 1
+--;;
+
 -- ── Instellingen (huisregel: config in de tool, niet in Vercel) ─────────────
 CREATE TABLE IF NOT EXISTS wms.settings (
   key        text PRIMARY KEY,

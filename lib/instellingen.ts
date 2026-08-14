@@ -19,7 +19,7 @@ export interface InstellingDefinitie {
   label: string;
   uitleg: string;
   type: InstellingType;
-  groep: "Magazijn" | "Tellen" | "Shadow-fase" | "Scannen";
+  groep: "Magazijn" | "Picken" | "Tellen" | "Shadow-fase" | "Scannen";
   standaard: unknown;
 }
 
@@ -49,6 +49,33 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
     type: "tekst",
     groep: "Magazijn",
     standaard: "^[A-Z]{1,4}(-\\d{1,3}){0,3}$",
+  },
+  {
+    key: "picken.expeditie_locatie",
+    label: "Expeditielocatie",
+    uitleg:
+      "Waar gepikte goederen naartoe geboekt worden. Ze blijven daar in het grootboek staan tot de opdracht verzonden wordt, zodat een doos op de kade vindbaar blijft.",
+    type: "tekst",
+    groep: "Picken",
+    standaard: "EXPEDITIE",
+  },
+  {
+    key: "picken.scan_locatie_verplicht",
+    label: "Locatie scannen verplicht",
+    uitleg:
+      "Dwingt de picker de locatie te scannen voordat hij mag bevestigen. Aan = minder misgrepen bij naast elkaar liggende vakken, uit = sneller.",
+    type: "schakelaar",
+    groep: "Picken",
+    standaard: true,
+  },
+  {
+    key: "picken.scan_artikel_verplicht",
+    label: "Artikel scannen verplicht",
+    uitleg:
+      "Idem voor het artikel zelf. Zet dit uit als te veel artikelen nog geen barcode hebben.",
+    type: "schakelaar",
+    groep: "Picken",
+    standaard: true,
   },
   {
     key: "tellen.verschil_drempel",

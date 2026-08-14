@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/migrate.mjs",
-    "db:smoke": "node scripts/smoke.mjs"
+    "db:smoke": "node scripts/smoke.mjs && node scripts/smoke-picken.mjs",
+    "db:status": "node scripts/db-status.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -63,7 +63,8 @@ npm run db:smoke
 | `npm run build` | Productiebuild |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:migrate` | Voert `db/schema.sql` uit (idempotent) |
-| `npm run db:smoke` | Test de voorraad-invarianten tegen de echte database |
+| `npm run db:smoke` | Test de voorraad- én pick-invarianten tegen de echte database |
+| `npm run db:status` | Read-only: schema, shadow-stand, pickwerk, scanbaarheid |
 | `node scripts/db-inspect.mjs` | Read-only: welke schema's en tabellen staan er |
 | `node scripts/db-verkennen.mjs` | Read-only: vorm van de bestaande voorraaddata |
 
@@ -84,6 +85,35 @@ die we aan het opruimen zijn. Sleutel is `sku`, net als in `srs_stock` en
 
 Eigen schema, niet `public`: Drizzle beheert `public` vanuit gentsnext en zou
 losse tabellen daar als drift zien.
+
+## Picken
+
+Het uitgaande werk. Pickopdrachten komen uit twee bronnen, beide al aanwezig in
+deze database:
+
+- **Weborders** — `public.orders.fulfillment_plan` bevat `shipments[]`, elk met
+  een `branchId`. Alles met `branchId '99'` of `isWarehouse` is magazijnwerk. De
+  core doet de verdeling winkel-vs-magazijn al; het WMS neemt die over en
+  bedenkt 'm niet opnieuw.
+- **Transfers** — `public.inbound_shipments` met `from_location` = magazijn.
+
+De import is idempotent via `UNIQUE (bron, bron_ref)`.
+
+**Toewijzing is advies, geen reservering.** De voorraad blijft op zijn plek tot
+er echt gepikt wordt; de view `wms.vrije_voorraad` trekt alleen af wat aan open
+pickregels is toegezegd, zodat twee pickers niet naar dezelfde vier stuks worden
+gestuurd. Ligt het er onverhoopt niet, dan meldt de picker "minder gevonden" en
+wijst het systeem het restant toe aan een andere locatie. Een echte reservering
+met tegenboekingen kost hier meer dan het oplevert.
+
+Picken is **twee boekingen**, niet één:
+
+1. `pick` — van de piklocatie naar `EXPEDITIE`. De goederen zijn uit het schap
+   maar nog in het pand, dus een doos op de kade blijft vindbaar.
+2. `verzonden` — van `EXPEDITIE` naar buiten, bij het afsluiten van de opdracht.
+
+De pickvolgorde volgt `locations.sort_order` — dát is waar de looproute aan
+hangt, en de reden dat locaties met een reeksgenerator worden aangemaakt.
 
 ## Shadow-fase
 

@@ -31,6 +31,13 @@ const PATHS: Record<string, React.ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </>
   ),
+  pick: (
+    <>
+      <path d="M3 4h3l1.6 9.6a2 2 0 0 0 2 1.7h7.7a2 2 0 0 0 2-1.6L21 7H6.5" />
+      <circle cx="10" cy="20" r="1.3" />
+      <circle cx="18" cy="20" r="1.3" />
+    </>
+  ),
   tellen: (
     <>
       <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4" />

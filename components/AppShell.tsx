@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 
 const MENU: { pad: string; label: string; icon: IconName }[] = [
   { pad: "/", label: "Overzicht", icon: "dashboard" },
+  { pad: "/picken", label: "Picken", icon: "pick" },
   { pad: "/scan", label: "Scannen", icon: "scan" },
   { pad: "/voorraad", label: "Voorraad", icon: "box" },
   { pad: "/locaties", label: "Locaties", icon: "locatie" },

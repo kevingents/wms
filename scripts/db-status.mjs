@@ -73,6 +73,33 @@ const [dekking] = await sql`
 const pct = (n) =>
   dekking.magazijn_skus ? `${Math.round((n / dekking.magazijn_skus) * 100)}%` : "—";
 
+/* Hoeveel pickwerk staat er klaar in de core, los van wat al geïmporteerd is. */
+const [pickwerk] = await sql`
+  WITH magazijn AS (
+    SELECT o.order_number,
+           jsonb_array_length(
+             coalesce(jsonb_path_query_array(
+               o.fulfillment_plan->'shipments',
+               '$[*] ? (@.branchId == "99" || @.isWarehouse == true)'), '[]'::jsonb)
+           ) AS zendingen
+      FROM public.orders o
+     WHERE o.fulfillment_status IN ('planned', 'pending')
+       AND o.fulfillment_plan->'shipments' IS NOT NULL
+  )
+  SELECT count(*) FILTER (WHERE zendingen > 0)::int AS orders_voor_magazijn,
+         count(*)::int AS orders_gepland
+    FROM magazijn`;
+
+const [geimporteerd] = await sql`
+  SELECT count(*) FILTER (WHERE status IN ('open', 'bezig'))::int AS werkvoorraad,
+         count(*)::int AS totaal
+    FROM wms.pick_orders`;
+
+console.log("\nPickwerk");
+console.log(`  orders met status planned/pending : ${pickwerk.orders_gepland}`);
+console.log(`  daarvan toegewezen aan magazijn   : ${pickwerk.orders_voor_magazijn}`);
+console.log(`  pickopdrachten in het WMS         : ${geimporteerd.totaal} (${geimporteerd.werkvoorraad} open)`);
+
 console.log("\nScanbaarheid van de magazijnvoorraad");
 console.log(`  sku's met voorraad in SRS : ${dekking.magazijn_skus}`);
 console.log(`  bekend in product_variants: ${dekking.bekend} (${pct(dekking.bekend)})`);
