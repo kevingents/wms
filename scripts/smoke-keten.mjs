@@ -31,7 +31,11 @@ if (!process.env.DATABASE_URL) {
 
 const sql = neon(process.env.DATABASE_URL);
 const RUN = `ZZ-KETEN-${Date.now().toString(36)}`;
-const SKU = "ZZ-TEST-KETEN";
+
+/* Eigen artikel per run. Het grootboek is append-only, dus de boekingen van een
+   vorige run blijven staan; met een vaste sku telt de sluitcontrole de historie
+   van alle runs bij elkaar op en meldt terecht een verschil. */
+const SKU = `ZZ-TEST-KETEN-${Date.now().toString(36)}`;
 let mislukt = 0;
 
 function check(naam, geslaagd, detail = "") {

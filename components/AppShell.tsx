@@ -30,7 +30,12 @@ const MENU: { pad: string; label: string; icon: IconName }[] = [
   { pad: "/", label: "Overzicht", icon: "dashboard" },
   { pad: "/kpi", label: "Cijfers", icon: "grafiek" },
   { pad: "/financieel", label: "Financieel", icon: "euro" },
+  { pad: "/colli", label: "Colli", icon: "collo" },
+  { pad: "/labels", label: "Labels", icon: "label" },
+  { pad: "/signalen", label: "Signalen", icon: "alert" },
+  { pad: "/gebruikers", label: "Gebruikers", icon: "users" },
   { pad: "/shadow", label: "SRS-check", icon: "synchroniseer" },
+  { pad: "/help", label: "Handleiding", icon: "help" },
 ];
 
 export function AppShell({

@@ -31,6 +31,34 @@ const PATHS: Record<string, React.ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </>
   ),
+  users: (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.9" />
+      <path d="M16 3.1a4 4 0 0 1 0 7.8" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </>
+  ),
+  label: (
+    <>
+      <path d="M3 7a2 2 0 0 1 2-2h8l8 8-8 8-8-8V7Z" />
+      <circle cx="8" cy="10" r="1.3" />
+    </>
+  ),
+  collo: (
+    <>
+      <rect x="3" y="8" width="18" height="12" rx="1" />
+      <path d="M3 12h18" />
+      <path d="M9 8V5h6v3" />
+    </>
+  ),
   euro: (
     <>
       <path d="M17 5.3A7 7 0 0 0 7.6 9M7.6 15a7 7 0 0 0 9.4 3.7" />

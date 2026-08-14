@@ -331,7 +331,11 @@ BEGIN
 END;
 $$
 --;;
+-- Beide namen droppen: de trigger heette eerst trg_boek_grootboek en is
+-- hernoemd zodat hij alfabetisch ná trg_apply_stock_move valt.
 DROP TRIGGER IF EXISTS trg_boek_grootboek ON wms.stock_moves
+--;;
+DROP TRIGGER IF EXISTS trg_z_boek_grootboek ON wms.stock_moves
 --;;
 -- Na de saldotrigger, want die kan de boeking nog weigeren (niet-negatief).
 -- Alfabetisch valt 'trg_z_boek…' achter 'trg_apply…', en Postgres vuurt

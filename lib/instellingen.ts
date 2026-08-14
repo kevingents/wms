@@ -27,6 +27,9 @@ export interface InstellingDefinitie {
     | "Aanvullen"
     | "Tellen"
     | "Financieel"
+    | "Verzenden"
+    | "Labels"
+    | "Bewaking"
     | "Shadow-fase"
     | "Scannen";
   standaard: unknown;
@@ -216,6 +219,59 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
       "Waar telverschillen en afschrijvingen heen gaan. Een aparte rekening, want dit is precies het bedrag dat je wilt zien dalen.",
     type: "tekst",
     groep: "Financieel",
+    standaard: "",
+  },
+  {
+    key: "verzenden.aanbieder",
+    label: "Verzendaanbieder",
+    uitleg:
+      "Wie het label levert: sendcloud, dhl of geen. Bij 'geen' vul je het trackingnummer met de hand in.",
+    type: "tekst",
+    groep: "Verzenden",
+    standaard: "geen",
+  },
+  {
+    key: "verzenden.afzender",
+    label: "Afzendernaam op het label",
+    uitleg: "Wat de klant als afzender ziet.",
+    type: "tekst",
+    groep: "Verzenden",
+    standaard: "GENTS Herenmode",
+  },
+  {
+    key: "labels.formaat",
+    label: "Labelformaat",
+    uitleg:
+      "Welk etiket in de printer zit. Bepaalt de afmetingen van de gegenereerde labels.",
+    type: "tekst",
+    groep: "Labels",
+    standaard: "50x25",
+  },
+  {
+    key: "labels.printer_taal",
+    label: "Printertaal",
+    uitleg:
+      "zpl voor een Zebra-labelprinter, pdf om af te drukken op een gewone printer.",
+    type: "tekst",
+    groep: "Labels",
+    standaard: "zpl",
+  },
+  {
+    key: "bewaking.pick_uren_alarm",
+    label: "Alarm bij pickwerk ouder dan (uren)",
+    uitleg:
+      "Blijft er werk langer dan dit liggen, dan komt er een signaal. Werk dat niemand meer ziet is hoe achterstanden ontstaan.",
+    type: "getal",
+    groep: "Bewaking",
+    standaard: 24,
+  },
+  {
+    key: "bewaking.email",
+    label: "Signalen mailen naar",
+    uitleg:
+      "Adres dat een bericht krijgt bij urgente signalen. Leeg = alleen in het scherm.",
+    type: "tekst",
+    groep: "Bewaking",
     standaard: "",
   },
   {

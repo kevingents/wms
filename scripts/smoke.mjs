@@ -32,6 +32,12 @@ if (!process.env.DATABASE_URL) {
 
 const sql = neon(process.env.DATABASE_URL);
 const SKU = "ZZ-TEST-SKU";
+
+/* Eigen kenmerk per run: het grootboek is append-only, dus sleutels van een
+   vorige run blijven bestaan. Met een vaste sleutel botst de eerste boeking van
+   de tweede run al, en dat is een testfout, geen systeemfout. */
+const RUN = `zz-${Date.now().toString(36)}`;
+
 let mislukt = 0;
 
 function check(naam, geslaagd, detail = "") {
@@ -103,7 +109,7 @@ check("pick van 7 uit een locatie met 6 wordt geweigerd", geweigerd);
 check("saldo A ongewijzigd na geweigerde pick", (await saldo(A)) === 6, `A=${await saldo(A)}`);
 
 /* 4 — retry met dezelfde idempotency-sleutel boekt niet dubbel */
-const sleutel = "smoke-idem-1";
+const sleutel = `${RUN}-idem-1`;
 await sql`
   INSERT INTO wms.stock_moves (sku, from_location_id, qty, reason, actor_name, idempotency_key)
   VALUES (${SKU}, ${A}, 2, 'pick', 'smoke', ${sleutel})`;
