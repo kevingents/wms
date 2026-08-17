@@ -33,7 +33,6 @@ const MENU: { pad: string; label: string; icon: IconName }[] = [
   { pad: "/colli", label: "Colli", icon: "collo" },
   { pad: "/labels", label: "Labels", icon: "label" },
   { pad: "/signalen", label: "Signalen", icon: "alert" },
-  { pad: "/gebruikers", label: "Gebruikers", icon: "users" },
   { pad: "/shadow", label: "SRS-check", icon: "synchroniseer" },
   { pad: "/help", label: "Handleiding", icon: "help" },
 ];

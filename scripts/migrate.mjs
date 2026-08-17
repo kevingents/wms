@@ -53,7 +53,13 @@ await laadEnvLocal();
 const sql = neon(dbUrl());
 
 /* Volgorde telt: schema-2 verwijst naar tabellen en views uit schema.sql. */
-const BESTANDEN = ["schema.sql", "schema-2.sql", "schema-3.sql", "schema-4.sql"];
+const BESTANDEN = [
+  "schema.sql",
+  "schema-2.sql",
+  "schema-3.sql",
+  "schema-4.sql",
+  "schema-5.sql",
+];
 
 let totaal = 0;
 
