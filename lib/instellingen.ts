@@ -81,6 +81,15 @@ export const INSTELLINGEN: InstellingDefinitie[] = [
     standaard: 1,
   },
   {
+    key: "picken.weborder_bron",
+    label: "Weborders ophalen uit",
+    uitleg:
+      "srs = de huidige stroom (aanbevolen), core = het planmodel van de nieuwe commerce-core, beide = allebei. Let op bij 'beide': SRS kent ordernummers als 36854 en de core als GSLFJW5G3F, en er is geen veld dat die aan elkaar knoopt — dezelfde order kan dan twee keer als pickopdracht verschijnen.",
+    type: "tekst",
+    groep: "Picken",
+    standaard: "srs",
+  },
+  {
     key: "picken.bakken_per_kar",
     label: "Bakken per kar",
     uitleg:

@@ -1,7 +1,7 @@
 # GENTS WMS — volledige kaart
 
 > Wat een volwaardig WMS bevat, wat hiervan af is, en waarom de rest in deze
-> volgorde staat. Bijgewerkt 14 augustus 2026.
+> volgorde staat. Bijgewerkt 15 augustus 2026.
 
 ## Uitgangspunt
 
@@ -44,20 +44,24 @@ we oplossen: voorraad die niet klopt en niemand die kan zeggen waarom.
 | Locaties, zones, looproute | ✅ | Reeksgenerator, `sort_order` = pickroute |
 | Voorraad-grootboek (append-only) | ✅ | Trigger-bewaakt, niet-negatief, herleidbaar |
 | Scannen (handterminal, PWA) | ✅ | Keyboard-wedge + camera-terugval, offline outbox |
-| Rechten en rollen | ✅ | SRS-personeelsnummer, drie rollen |
+| Rechten en rollen | ✅ | Drie rollen in `wms.gebruikers`, met audit-spoor |
 | Instellingen in de tool | ✅ | `wms.settings`, geen redeploy nodig |
+| Locaties uit SRS | ✅ | 611 vakken, looproute uit de code, telhistorie mee |
 | **Inbound** | | |
 | Ontvangst tegen verwachting | ✅ | Regels, afwijkingen, quarantaine |
 | Inslag / putaway | ✅ | Snelle inslag, locatie blijft staan |
-| Cross-docking | ⬜ | Ontvangst direct naar expeditie, zonder inslag |
+| Colli (LPN) | ✅ | Doos of pallet als eenheid; verplaatsen in één handeling |
+| Cross-docking | ✅ | Ontvangst direct naar expeditie waar vraag op wacht |
 | **Voorraad** | | |
 | Tellen (ad hoc, blind) | ✅ | Verschil-drempel, controle-markering |
 | Cyclustellingen (ABC-programma) | ✅ | Telkandidaten op omloopsnelheid + ouderdom |
 | Replenishment bulk → pick | ✅ | Min/max per piklocatie, taken-wachtrij |
 | Slotting-advies | ⬜ | Hardlopers vooraan; vraagt verkoophistorie |
 | **Outbound** | | |
+| Weborders uit SRS | ✅ | De huidige stroom; bron instelbaar (srs/core/beide) |
 | Picken per order | ✅ | Toewijzing, tekortafhandeling |
 | Batchpicken met bakken | ✅ | Eén ronde, één keer lopen |
+| Winkelaanvulling (looplijst) | ✅ | Tekort vs. vrije voorraad, evenredig verdeeld |
 | Inpakken | ✅ | Doos kiezen, controleren, gewicht |
 | Verzenden en labels | 🟡 | Zending vastgelegd; vervoerder-API nog niet |
 | **Reverse** | | |
@@ -74,13 +78,29 @@ we oplossen: voorraad die niet klopt en niemand die kan zeggen waarom.
 | Koppeling met de portal | ✅ | Eén deur, beide richtingen |
 | Werkvoorraad en taken | ✅ | Generieke takenwachtrij |
 | KPI's en productiviteit | ✅ | Picks per uur, doorlooptijd, telnauwkeurigheid |
-| Audit-spoor buiten voorraad | ✅ | Wie wijzigde welke instelling of locatie |
+| Audit-spoor buiten voorraad | ✅ | Wie wijzigde welke instelling, rol of locatie |
+| Bewaking en signalen | ✅ | Acht regels; wat opgelost is sluit zichzelf |
+| Labels printen (locatie, artikel) | ✅ | ZPL of afdrukbare pagina, eigen Code128 |
+| Handleiding voor de vloer | ✅ | In de app en als los document |
 | **Later** | | |
 | Vervoerder-integratie (DHL/Sendcloud) | ⬜ | Label ophalen, tracking terugkoppelen |
-| Labels printen (locatie, artikel) | ⬜ | Vraagt printerkeuze (ZPL?) |
 | Slotting op verkoopsnelheid | ⬜ | Ná een paar maanden echte pickdata |
 | Taakinterleaving | ⬜ | Inslag combineren met pickronde |
 | Vision voor artikelen zonder barcode | ⬜ | 17% van het magazijn |
+
+## Wat er nu tussen zit en ingebruikname
+
+Het systeem is af genoeg om mee te beginnen; wat resteert is geen bouwwerk maar
+inrichting:
+
+1. **617 vakken hebben nog geen label.** Zonder geplakte barcode kan niemand
+   scannen. Print per zone bij `/labels` — zone H is 68 vakken en groot genoeg
+   om de hele flow op te proberen.
+2. **De beginvoorraad moet erin.** Tot die tijd staat elke pickopdracht op "geen
+   voorraad toegewezen" en toont de looplijst nul leverbaar. Beide zijn correct
+   gedrag, geen storing.
+3. **Wijs een beheerder aan** bij `/gebruikers`. Zolang die lijst leeg is heeft
+   iedereen die inlogt alle rechten.
 
 ## Waarom deze volgorde
 

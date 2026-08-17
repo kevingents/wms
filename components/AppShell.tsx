@@ -145,6 +145,7 @@ export function AppShell({
         <div className="mt-4 border-t border-white/10 pt-3">
           {[
             { pad: "/help", label: "Handleiding", icon: "help" as IconName },
+            { pad: "/gebruikers", label: "Gebruikers", icon: "users" as IconName },
             { pad: "/instellingen", label: "Instellingen", icon: "instellingen" as IconName },
           ].map((m) => (
             <Link

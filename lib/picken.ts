@@ -248,18 +248,30 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
     srsFout: null,
   };
 
-  /* ── Weborders ────────────────────────────────────────────────────────────
+  /* Welke weborder-bron telt. Standaard SRS, want daar loopt het echte werk.
+     Beide tegelijk kan, maar dan kán dezelfde order twee keer verschijnen — SRS
+     kent ordernummers als 36854 en de core als GSLFJW5G3F, en er is geen veld
+     dat die aan elkaar knoopt. Daarom is het een bewuste keuze en geen default. */
+  const weborderBron = String(
+    await instelling<string>("picken.weborder_bron")
+  ).toLowerCase();
+  const uitCore = weborderBron === "core" || weborderBron === "beide";
+  const uitSrs = weborderBron === "srs" || weborderBron === "beide";
+
+  /* ── Weborders uit de core ────────────────────────────────────────────────
      De core plant per order welke vestiging welke regels levert. Wij pakken
      alleen de zendingen die aan het magazijn zijn toegewezen. */
-  const orders = await query<OrderRij>(
-    `SELECT order_number, fulfillment_plan
-       FROM public.orders
-      WHERE fulfillment_status IN ('planned', 'pending')
-        AND fulfillment_plan IS NOT NULL
-        AND fulfillment_plan->'shipments' IS NOT NULL
-      ORDER BY created_at
-      LIMIT 500`
-  );
+  const orders = uitCore
+    ? await query<OrderRij>(
+        `SELECT order_number, fulfillment_plan
+           FROM public.orders
+          WHERE fulfillment_status IN ('planned', 'pending')
+            AND fulfillment_plan IS NOT NULL
+            AND fulfillment_plan->'shipments' IS NOT NULL
+          ORDER BY created_at
+          LIMIT 500`
+      )
+    : [];
 
   for (const order of orders) {
     const zendingen = order.fulfillment_plan?.shipments ?? [];
@@ -298,7 +310,8 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
      Best-effort: valt SRS of storegents weg, dan gaat de rest van de import
      gewoon door. Een transfer die niet geïmporteerd wordt omdat de weborders
      haperen, is een tweede probleem dat je er niet bij wilt. */
-  try {
+  if (uitSrs) {
+    try {
     const bron = await haalSrsWeborders();
     resultaat.srsFout = bron.fetchFout;
 
@@ -330,9 +343,12 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
         resultaat.overgeslagen += 1;
       }
     }
-  } catch (err) {
-    resultaat.srsFout =
-      err instanceof BoekingsFout ? err.message : "SRS-weborders konden niet opgehaald worden.";
+    } catch (err) {
+      resultaat.srsFout =
+        err instanceof BoekingsFout
+          ? err.message
+          : "SRS-weborders konden niet opgehaald worden.";
+    }
   }
 
   /* ── Transfers vanuit het magazijn naar een winkel ────────────────────────── */

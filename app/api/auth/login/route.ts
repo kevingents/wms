@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendJson, backendBase } from "@/lib/backend";
 import { signSession, SESSION_COOKIE } from "@/lib/session";
-import { rolVoor } from "@/lib/toegang";
+import { rolVoor, registreerLogin } from "@/lib/toegang";
 
 export const runtime = "nodejs";
 
@@ -67,6 +67,16 @@ export async function POST(req: NextRequest) {
   const userId = String(emp.personnelId || personnelId);
   const naam =
     String(emp.name || emp.externalName || emp.internalName || "").trim() || "Medewerker";
+
+  /* Vastleggen dat deze medewerker binnenkwam, vóór het bepalen van de rol: zo
+     verschijnt hij vanzelf in het gebruikersscherm en hoeft een beheerder geen
+     personeelsnummers over te typen. Dat is precies de stap waar zulke schermen
+     normaal op stuklopen. Mislukt het, dan is inloggen belangrijker. */
+  try {
+    await registreerLogin(userId, naam);
+  } catch {
+    /* De sessie mag hier niet op vastlopen. */
+  }
 
   const sessie = {
     userId,
