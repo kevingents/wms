@@ -109,6 +109,16 @@ export function PickLijst({ opdrachten }: { opdrachten: PickOpdracht[] }) {
                             {o.toegewezen_naam ?? "bezig"}
                           </span>
                         )}
+                        {/* Niet leverbaar vóór het lopen zichtbaar maken: anders
+                            valt de picker halverwege stil bij een regel zonder
+                            locatie, en dat kost een hele ronde. */}
+                        {o.zonder_locatie > 0 && (
+                          <span className="rounded bg-bad-100 px-2 py-0.5 text-xs text-bad">
+                            {o.zonder_locatie === o.open_regels
+                              ? "geen voorraad"
+                              : `${o.zonder_locatie} regel(s) zonder voorraad`}
+                          </span>
+                        )}
                       </span>
                       <span className="mt-0.5 block truncate text-sm text-slate">
                         {o.bestemming || "geen bestemming"} · {o.stuks} stuks over{" "}

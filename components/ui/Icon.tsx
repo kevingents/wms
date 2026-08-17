@@ -52,6 +52,14 @@ const PATHS: Record<string, React.ReactNode> = {
       <circle cx="8" cy="10" r="1.3" />
     </>
   ),
+  /* Winkelpui — de aanvulstroom naar de filialen. */
+  winkel: (
+    <>
+      <path d="M3 9V7l2-3h14l2 3v2" />
+      <path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
+      <path d="M9 21v-6h6v6" />
+    </>
+  ),
   collo: (
     <>
       <rect x="3" y="8" width="18" height="12" rx="1" />

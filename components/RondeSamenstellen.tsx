@@ -165,6 +165,15 @@ export function RondeSamenstellen({
                         {o.bestemming || "geen bestemming"} · {o.stuks} stuks over{" "}
                         {o.regels} regel{o.regels === 1 ? "" : "s"}
                       </span>
+                      {/* Een order die niet gelopen kan worden hoort niet in een
+                          ronde: dan staat er een bak op de kar die leeg blijft. */}
+                      {o.zonder_locatie > 0 && (
+                        <span className="mt-0.5 block text-xs font-medium text-bad">
+                          {o.zonder_locatie === o.open_regels
+                            ? "geen voorraad toegewezen — niet te lopen"
+                            : `${o.zonder_locatie} van ${o.open_regels} regels zonder voorraad`}
+                        </span>
+                      )}
                     </span>
                   </button>
                 </li>

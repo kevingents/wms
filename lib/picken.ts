@@ -51,6 +51,8 @@ export interface PickOpdracht {
   regels: number;
   open_regels: number;
   stuks: number;
+  /** Open regels waaraan geen voorraad toegewezen kon worden. */
+  zonder_locatie: number;
 }
 
 export interface PickRegel {
@@ -74,11 +76,20 @@ export interface PickRegel {
 
 /* ── Lezen ─────────────────────────────────────────────────────────────────── */
 
+/**
+ * `zonder_locatie` is er zodat een teamleider ziet dat een opdracht niet
+ * gelopen kan worden vóórdat iemand met een kar op pad gaat. Een regel zonder
+ * locatie betekent dat er geen vrije voorraad aan toegewezen kon worden; de
+ * picker zou bij die regel stilvallen en dat is precies waar tijd verdampt.
+ */
 const OPDRACHT_SELECT = `
   SELECT o.*,
          (SELECT count(*) FROM wms.pick_lines l WHERE l.pick_order_id = o.id)::int AS regels,
          (SELECT count(*) FROM wms.pick_lines l
            WHERE l.pick_order_id = o.id AND l.status = 'open')::int AS open_regels,
+         (SELECT count(*) FROM wms.pick_lines l
+           WHERE l.pick_order_id = o.id AND l.status = 'open'
+             AND l.location_id IS NULL)::int AS zonder_locatie,
          (SELECT coalesce(sum(l.gevraagd), 0) FROM wms.pick_lines l
            WHERE l.pick_order_id = o.id)::int AS stuks
     FROM wms.pick_orders o`;

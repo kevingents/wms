@@ -7,35 +7,86 @@ import { OutboxBalk } from "@/components/OutboxBalk";
 import { cn } from "@/lib/cn";
 
 /**
- * Schil om elke pagina. Navigatie staat onderaan op klein scherm (duimbereik op
- * een scanner) en links op groot scherm.
+ * Schil om elke pagina.
+ *
+ * WAAROM GROEPEN EN GEEN PLATTE LIJST
+ * -----------------------------------
+ * Er zijn eenentwintig schermen. Een platte lijst daarvan is een lijst die je
+ * moet lézen om iets te vinden, en dat doe je in een magazijn niet — dan onthoud
+ * je gewoon de derde van boven en dat gaat mis zodra er iets bijkomt.
+ *
+ * De groepen volgen wat iemand aan het doen is, niet hoe het systeem in elkaar
+ * zit: goederen die eruit gaan, goederen die erin komen, de voorraad zelf,
+ * sturing. Dat is de indeling die een magazijnmedewerker al in z'n hoofd heeft.
+ *
+ * WAAROM DE ONDERBALK VAST IS
+ * ---------------------------
+ * Op een handterminal past er vijf in de duimzone. Die vijf staan hier
+ * expliciet en zijn niet "de eerste vijf van de lijst" — anders verschuift de
+ * balk zodra er een scherm bijkomt, en spiergeheugen is precies wat je op een
+ * scanner wél wil hebben. Al het overige gaat via het startscherm of de zijbalk.
  */
 
-/* Op de handterminal is /terminal het startscherm; op een bureaublad /. Beide
-   staan in het menu zodat je er altijd uit kunt. */
-const MENU: { pad: string; label: string; icon: IconName }[] = [
-  /* De eerste vijf zijn wat er in de onderbalk van een handterminal past. */
-  { pad: "/terminal", label: "Terminal", icon: "terminal" },
+interface Item {
+  pad: string;
+  label: string;
+  icon: IconName;
+}
+
+/** De vijf in de duimzone van een handterminal. Wijzig dit niet lichtvaardig. */
+const ONDERBALK: Item[] = [
+  { pad: "/terminal", label: "Start", icon: "terminal" },
   { pad: "/rondes", label: "Rondes", icon: "kar" },
   { pad: "/inpakken", label: "Inpakken", icon: "box" },
   { pad: "/taken", label: "Taken", icon: "taken" },
   { pad: "/scan", label: "Scannen", icon: "scan" },
-  { pad: "/picken", label: "Picken", icon: "pick" },
-  { pad: "/ontvangst", label: "Ontvangst", icon: "inslag" },
-  { pad: "/retouren", label: "Retouren", icon: "retour" },
-  { pad: "/inslag", label: "Inslag", icon: "inslag" },
-  { pad: "/tellen", label: "Tellen", icon: "tellen" },
-  { pad: "/voorraad", label: "Voorraad", icon: "zoek" },
-  { pad: "/locaties", label: "Locaties", icon: "locatie" },
-  { pad: "/", label: "Overzicht", icon: "dashboard" },
-  { pad: "/kpi", label: "Cijfers", icon: "grafiek" },
-  { pad: "/financieel", label: "Financieel", icon: "euro" },
-  { pad: "/colli", label: "Colli", icon: "collo" },
-  { pad: "/labels", label: "Labels", icon: "label" },
-  { pad: "/signalen", label: "Signalen", icon: "alert" },
-  { pad: "/shadow", label: "SRS-check", icon: "synchroniseer" },
-  { pad: "/help", label: "Handleiding", icon: "help" },
 ];
+
+const GROEPEN: { titel: string; items: Item[] }[] = [
+  {
+    titel: "Eruit",
+    items: [
+      { pad: "/rondes", label: "Pickrondes", icon: "kar" },
+      { pad: "/picken", label: "Losse orders", icon: "pick" },
+      { pad: "/aanvullen", label: "Winkelaanvulling", icon: "winkel" },
+      { pad: "/inpakken", label: "Inpakken", icon: "box" },
+    ],
+  },
+  {
+    titel: "Erin",
+    items: [
+      { pad: "/ontvangst", label: "Ontvangst", icon: "inslag" },
+      { pad: "/inslag", label: "Inslag", icon: "inslag" },
+      { pad: "/colli", label: "Colli", icon: "collo" },
+      { pad: "/retouren", label: "Retouren", icon: "retour" },
+    ],
+  },
+  {
+    titel: "Voorraad",
+    items: [
+      { pad: "/voorraad", label: "Opzoeken", icon: "zoek" },
+      { pad: "/scan", label: "Verplaatsen", icon: "scan" },
+      { pad: "/tellen", label: "Tellen", icon: "tellen" },
+      { pad: "/taken", label: "Taken", icon: "taken" },
+      { pad: "/locaties", label: "Locaties", icon: "locatie" },
+      { pad: "/labels", label: "Labels", icon: "label" },
+    ],
+  },
+  {
+    titel: "Sturing",
+    items: [
+      { pad: "/", label: "Overzicht", icon: "dashboard" },
+      { pad: "/signalen", label: "Signalen", icon: "alert" },
+      { pad: "/kpi", label: "Cijfers", icon: "grafiek" },
+      { pad: "/financieel", label: "Financieel", icon: "euro" },
+      { pad: "/shadow", label: "SRS-check", icon: "synchroniseer" },
+    ],
+  },
+];
+
+function isActief(pad: string, huidig: string): boolean {
+  return pad === "/" ? huidig === "/" : huidig === pad || huidig.startsWith(`${pad}/`);
+}
 
 export function AppShell({
   gebruiker,
@@ -50,54 +101,66 @@ export function AppShell({
 
   return (
     <div className="min-h-screen sm:flex">
+      {/* ── Zijbalk op groot scherm ──────────────────────────────────────── */}
       <nav
         className={cn(
-          "z-20 border-navy-700 bg-navy text-white",
-          "fixed inset-x-0 bottom-0 flex justify-around border-t",
-          "sm:static sm:w-56 sm:flex-col sm:justify-start sm:border-r sm:border-t-0 sm:p-3"
+          "z-20 hidden border-navy-700 bg-navy text-white",
+          "sm:flex sm:w-56 sm:shrink-0 sm:flex-col sm:border-r sm:p-3"
         )}
+        aria-label="Hoofdmenu"
       >
-        <div className="hidden px-2 pb-4 pt-2 sm:block">
-          <div className="text-sm font-bold uppercase tracking-widest">GENTS WMS</div>
-          <div className="mt-0.5 text-xs text-white/60">{magazijn}</div>
+        <Link href="/terminal" className="block px-2 pb-4 pt-2">
+          <span className="block text-sm font-bold uppercase tracking-widest">
+            GENTS WMS
+          </span>
+          <span className="mt-0.5 block text-xs text-white/60">{magazijn}</span>
+        </Link>
+
+        <div className="flex-1 space-y-4 overflow-y-auto">
+          {GROEPEN.map((groep) => (
+            <div key={groep.titel}>
+              <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-white/40">
+                {groep.titel}
+              </div>
+              {groep.items.map((m) => (
+                <Link
+                  key={`${groep.titel}-${m.pad}`}
+                  href={m.pad}
+                  aria-current={isActief(m.pad, pad) ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-tap items-center gap-3 rounded-lg px-3 text-sm font-medium",
+                    isActief(m.pad, pad)
+                      ? "bg-navy-600 text-white"
+                      : "text-white/70 hover:text-white"
+                  )}
+                >
+                  <Icon name={m.icon} size={20} />
+                  {m.label}
+                </Link>
+              ))}
+            </div>
+          ))}
         </div>
 
-        {MENU.map((m, i) => {
-          const actief = m.pad === "/" ? pad === "/" : pad.startsWith(m.pad);
-          return (
+        <div className="mt-4 border-t border-white/10 pt-3">
+          {[
+            { pad: "/help", label: "Handleiding", icon: "help" as IconName },
+            { pad: "/instellingen", label: "Instellingen", icon: "instellingen" as IconName },
+          ].map((m) => (
             <Link
               key={m.pad}
               href={m.pad}
-              aria-current={actief ? "page" : undefined}
               className={cn(
-                "flex min-h-tap flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
-                "sm:flex-none sm:flex-row sm:justify-start sm:gap-3 sm:rounded-lg sm:px-3 sm:text-sm",
-                /* De onderbalk van een handterminal heeft plek voor vijf tegels;
-                   de rest bereik je via het startscherm. Op een bureaublad past
-                   het hele menu wel in de zijbalk. */
-                i >= 5 && "hidden sm:flex",
-                actief ? "bg-navy-600 text-white" : "text-white/70 hover:text-white"
+                "flex min-h-tap items-center gap-3 rounded-lg px-3 text-sm font-medium",
+                isActief(m.pad, pad)
+                  ? "bg-navy-600 text-white"
+                  : "text-white/70 hover:text-white"
               )}
             >
-              <Icon name={m.icon} size={22} />
-              <span>{m.label}</span>
+              <Icon name={m.icon} size={20} />
+              {m.label}
             </Link>
-          );
-        })}
-
-        <div className="hidden sm:mt-auto sm:block sm:border-t sm:border-white/10 sm:pt-3">
-          <Link
-            href="/instellingen"
-            className={cn(
-              "flex min-h-tap items-center gap-3 rounded-lg px-3 text-sm font-medium",
-              pad.startsWith("/instellingen")
-                ? "bg-navy-600 text-white"
-                : "text-white/70 hover:text-white"
-            )}
-          >
-            <Icon name="instellingen" size={20} />
-            Instellingen
-          </Link>
+          ))}
           <form action="/api/auth/logout" method="post">
             <button
               type="submit"
@@ -108,6 +171,27 @@ export function AppShell({
             </button>
           </form>
         </div>
+      </nav>
+
+      {/* ── Onderbalk op de handterminal ─────────────────────────────────── */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-navy-700 bg-navy text-white sm:hidden"
+        aria-label="Hoofdmenu"
+      >
+        {ONDERBALK.map((m) => (
+          <Link
+            key={m.pad}
+            href={m.pad}
+            aria-current={isActief(m.pad, pad) ? "page" : undefined}
+            className={cn(
+              "flex min-h-tap flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
+              isActief(m.pad, pad) ? "bg-navy-600 text-white" : "text-white/70"
+            )}
+          >
+            <Icon name={m.icon} size={22} />
+            <span>{m.label}</span>
+          </Link>
+        ))}
       </nav>
 
       <div className="flex-1 pb-20 sm:pb-0">
