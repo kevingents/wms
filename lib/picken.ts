@@ -1,13 +1,22 @@
 import { query, queryOne, BoekingsFout, vertaalDbFout } from "./db";
 import { boekMutatie, zoekLocatie } from "./voorraad";
 import { instelling } from "./instellingen";
+import {
+  haalSrsWeborders,
+  groepeerTotOpdrachten,
+  normaliseerOrdernummer,
+} from "./srs-weborders";
 
 /**
  * Picken — het uitgaande werk van het magazijn.
  *
  * Waar het werk vandaan komt:
- *   weborder — `public.orders.fulfillment_plan` bevat `shipments[]`, elk met een
- *              `branchId`. Alles met branchId '99' (of `isWarehouse`) is voor
+ *   weborder — twee bronnen die op hetzelfde `bron_ref` uitkomen, zodat een
+ *              order die in allebei zit maar één opdracht oplevert:
+ *              (a) SRS, via storegents `/api/admin/open-weborders-detail` —
+ *                  dit is vandaag de échte stroom, zie lib/srs-weborders.ts;
+ *              (b) `public.orders.fulfillment_plan` bevat `shipments[]`, elk met
+ *              een `branchId`. Alles met branchId '99' (of `isWarehouse`) is voor
  *              het magazijn. De core doet de toewijzing winkel-vs-magazijn al;
  *              wij nemen die over, we bedenken 'm niet opnieuw.
  *   transfer — `public.inbound_shipments` met `from_location` = magazijn.
@@ -210,6 +219,12 @@ export interface ImportResultaat {
   overgeslagen: number;
   regels: number;
   zonderVoorraad: number;
+  /** Hoeveel van de nieuwe opdrachten uit SRS kwamen in plaats van uit de core. */
+  uitSrs: number;
+  /** Regels die SRS meldt maar waarvan het artikel onbekend is in de catalogus. */
+  onbekendeArtikelen: number;
+  /** Melding als SRS of storegents niet meewerkte; null als alles goed ging. */
+  srsFout: string | null;
 }
 
 async function nieuweCode(): Promise<string> {
@@ -223,7 +238,15 @@ async function nieuweCode(): Promise<string> {
  * Haalt nieuw pickwerk binnen uit de core. Veilig om herhaald te draaien.
  */
 export async function importeerPickwerk(door: string | null): Promise<ImportResultaat> {
-  const resultaat: ImportResultaat = { nieuw: 0, overgeslagen: 0, regels: 0, zonderVoorraad: 0 };
+  const resultaat: ImportResultaat = {
+    nieuw: 0,
+    overgeslagen: 0,
+    regels: 0,
+    zonderVoorraad: 0,
+    uitSrs: 0,
+    onbekendeArtikelen: 0,
+    srsFout: null,
+  };
 
   /* ── Weborders ────────────────────────────────────────────────────────────
      De core plant per order welke vestiging welke regels levert. Wij pakken
@@ -250,7 +273,9 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
 
     const gemaakt = await maakPickOpdracht({
       bron: "weborder",
-      bronRef: order.order_number,
+      /* Genormaliseerd, want dezelfde order kan ook via SRS binnenkomen en dan
+         moet het op hetzelfde bron_ref uitkomen — anders staat hij er twee keer. */
+      bronRef: normaliseerOrdernummer(order.order_number),
       bestemming: "Klant (webshop)",
       prioriteit: 10,
       door,
@@ -262,6 +287,52 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
     } else {
       resultaat.overgeslagen += 1;
     }
+  }
+
+  /* ── Open weborders uit SRS ───────────────────────────────────────────────
+     Het planmodel van de core draait nog als pilot: van de veertig tot zestig
+     weborders per dag krijgt maar een handvol een plan. Het echte werk staat in
+     SRS, en zolang dat zo is moet het WMS dát lezen — anders ziet de vloer een
+     fractie van wat er ligt.
+
+     Best-effort: valt SRS of storegents weg, dan gaat de rest van de import
+     gewoon door. Een transfer die niet geïmporteerd wordt omdat de weborders
+     haperen, is een tweede probleem dat je er niet bij wilt. */
+  try {
+    const bron = await haalSrsWeborders();
+    resultaat.srsFout = bron.fetchFout;
+
+    const opdrachten = await groepeerTotOpdrachten(bron.regels);
+    for (const o of opdrachten) {
+      if (o.onbekend.length > 0) {
+        resultaat.onbekendeArtikelen += o.onbekend.length;
+      }
+      if (o.regels.length === 0) continue;
+
+      const gemaakt = await maakPickOpdracht({
+        bron: "weborder",
+        bronRef: o.ordernummer,
+        bestemming: "Klant (webshop)",
+        /* Te laat wint van op tijd; binnen die groep bepaalt de leeftijd. */
+        prioriteit: o.isLate ? 20 : 10,
+        door,
+        note:
+          o.onbekend.length > 0
+            ? `${o.onbekend.length} regel(s) met een onbekend artikel — niet op de picklijst gezet`
+            : null,
+        regels: o.regels,
+      });
+      if (gemaakt) {
+        resultaat.nieuw += 1;
+        resultaat.regels += o.regels.length;
+        resultaat.uitSrs += 1;
+      } else {
+        resultaat.overgeslagen += 1;
+      }
+    }
+  } catch (err) {
+    resultaat.srsFout =
+      err instanceof BoekingsFout ? err.message : "SRS-weborders konden niet opgehaald worden.";
   }
 
   /* ── Transfers vanuit het magazijn naar een winkel ────────────────────────── */

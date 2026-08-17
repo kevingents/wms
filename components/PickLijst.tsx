@@ -52,11 +52,22 @@ export function PickLijst({ opdrachten }: { opdrachten: PickOpdracht[] }) {
       setMelding(
         data.nieuw === 0
           ? "Geen nieuw pickwerk gevonden."
-          : `${data.nieuw} nieuwe opdracht${data.nieuw === 1 ? "" : "en"} met ${data.regels} regels.` +
+          : `${data.nieuw} nieuwe opdracht${data.nieuw === 1 ? "" : "en"} met ${data.regels} regels` +
+              (data.uitSrs > 0 ? `, waarvan ${data.uitSrs} uit SRS` : "") +
+              "." +
               (data.zonderVoorraad > 0
                 ? ` Let op: ${data.zonderVoorraad} regel(s) zonder voorraad in het magazijn.`
                 : "")
       );
+      /* SRS-problemen apart melden: de rest van de import is gewoon gelukt, maar
+         als de weborders eruit liggen ziet de vloer werk over het hoofd. */
+      if (data.srsFout) {
+        setFout(`SRS-weborders niet opgehaald: ${data.srsFout}`);
+      } else if (data.onbekendeArtikelen > 0) {
+        setFout(
+          `${data.onbekendeArtikelen} orderregel(s) uit SRS hebben een artikel dat niet in de catalogus staat. Die staan niet op de picklijst — meld dit bij kantoor.`
+        );
+      }
       router.refresh();
     } catch {
       setFout("Geen verbinding met de server.");
