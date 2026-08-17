@@ -253,8 +253,22 @@ export function AanvulView({ magBeheren }: { magBeheren: boolean }) {
                                 {r.maat ? ` · ${r.maat}` : ""}
                               </span>
                             </span>
-                            <span className="shrink-0 text-xs text-slate">
-                              vraagt {r.tekort} · {r.vrij} vrij
+                            {/* Wat de winkel nu heeft tegenover wat hij hoort te
+                                hebben — dát verklaart waarom deze regel voorrang
+                                kreeg, en niet het kale tekort. */}
+                            <span className="shrink-0 text-right text-xs text-slate">
+                              <span className="block">
+                                vraagt {r.tekort} · {r.vrij} vrij
+                              </span>
+                              {r.ideaal > 0 && (
+                                <span
+                                  className={
+                                    r.aanwezig === 0 ? "block font-semibold text-bad" : "block"
+                                  }
+                                >
+                                  winkel heeft {r.aanwezig}/{r.ideaal}
+                                </span>
+                              )}
                             </span>
                           </li>
                         ))}
@@ -282,9 +296,11 @@ export function AanvulView({ magBeheren }: { magBeheren: boolean }) {
           inkoopwerk en hoort bij de portal, niet hier.
         </p>
         <p className="mt-2 text-sm text-slate">
-          Vraagt meer dan één winkel hetzelfde artikel, dan wordt het evenredig
-          verdeeld naar tekort. Wie het eerst vraagt krijgt dus niet alles — anders
-          krijgt de winkel met de snelste manager structureel voorrang.
+          Vraagt meer dan één winkel hetzelfde artikel, dan wordt het verdeeld naar
+          tekort én naar hoe leeg de winkel staat. Een filiaal met nul op voorraad
+          telt dubbel ten opzichte van een filiaal dat bijna vol is — die eerste
+          verkoopt niets meer, die tweede draait gewoon door. Wie het eerst vraagt
+          krijgt dus niet alles.
         </p>
         <p className="mt-2 rounded-lg bg-navy-50 px-3 py-2 text-sm text-slate">
           <span className="font-semibold text-navy">Let op: </span>

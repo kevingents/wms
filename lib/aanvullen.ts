@@ -28,6 +28,9 @@ export interface AanvulRegel {
   tekort: number;
   vrij: number;
   toegewezen: number;
+  /** Wat de winkel nu heeft en zou moeten hebben — verklaart de voorrang. */
+  aanwezig: number;
+  ideaal: number;
 }
 
 export interface AanvulAdvies {
@@ -44,24 +47,62 @@ interface RuweRegel {
   store: string;
   sku: string;
   tekort: number;
+  aanwezig: number;
+  ideaal: number;
   omschrijving: string | null;
   maat: string | null;
 }
 
 /**
- * Verdeelt `beschikbaar` stuks over de vragers, evenredig naar tekort.
+ * Hoe dringend is dit tekort voor déze winkel?
+ *
+ * Absoluut tekort alleen is een slechte maatstaf. Een winkel met ideaal 20 en
+ * twaalf op voorraad heeft acht tekort maar verkoopt gewoon door; een winkel met
+ * ideaal 2 en niks op voorraad heeft twee tekort en staat met lege handen. Die
+ * tweede hoort voor te gaan.
+ *
+ * Vandaar een factor tussen 1 en 2: helemaal leeg telt dubbel, bijna vol telt
+ * enkel. Geen scherpere weging, want dit is een benadering van vraag — de échte
+ * verkoopsnelheid per winkel zit in de portal en niet hier.
+ */
+function urgentie(r: { aanwezig: number; ideaal: number }): number {
+  const ideaal = Number(r.ideaal) || 0;
+  if (ideaal <= 0) return 1;
+  const dekking = Math.min(Math.max(Number(r.aanwezig) / ideaal, 0), 1);
+  return 1 + (1 - dekking);
+}
+
+interface Vraag {
+  /** Bovengrens: nooit meer toewijzen dan een winkel tekortkomt. */
+  gevraagd: number;
+  /** Verdeelsleutel: tekort maal urgentie. */
+  gewicht: number;
+}
+
+/**
+ * Verdeelt `beschikbaar` stuks over de vragers naar gewicht, met het gevraagde
+ * aantal als harde bovengrens.
  *
  * Grootste-resten-methode: eerst ieder zijn hele deel, daarna gaan de
  * overgebleven stuks naar wie de grootste breuk overhield. Zo blijft de som
  * exact gelijk aan wat er ligt — bij gewoon afronden verdwijnen er stuks, en dat
  * merk je pas als de picker er eentje overhoudt.
+ *
+ * Gewicht en bovengrens zijn bewust twee dingen. Ze samenvoegen zou betekenen
+ * dat een winkel met een hoge urgentie méér krijgt dan hij tekortkomt, en dan
+ * staat er straks voorraad in een winkel die er niet om vroeg.
  */
-function verdeel(vragen: number[], beschikbaar: number): number[] {
-  const totaal = vragen.reduce((s, v) => s + v, 0);
-  if (totaal === 0 || beschikbaar <= 0) return vragen.map(() => 0);
-  if (beschikbaar >= totaal) return [...vragen];
+function verdeel(vragen: Vraag[], beschikbaar: number): number[] {
+  const totaalGevraagd = vragen.reduce((s, v) => s + v.gevraagd, 0);
+  const totaalGewicht = vragen.reduce((s, v) => s + v.gewicht, 0);
 
-  const exact = vragen.map((v) => (v * beschikbaar) / totaal);
+  if (totaalGevraagd === 0 || beschikbaar <= 0) return vragen.map(() => 0);
+  if (beschikbaar >= totaalGevraagd) return vragen.map((v) => v.gevraagd);
+  if (totaalGewicht === 0) return vragen.map(() => 0);
+
+  const exact = vragen.map((v) =>
+    Math.min((v.gewicht * beschikbaar) / totaalGewicht, v.gevraagd)
+  );
   const toegewezen = exact.map((e) => Math.floor(e));
   let rest = beschikbaar - toegewezen.reduce((s, v) => s + v, 0);
 
@@ -69,12 +110,17 @@ function verdeel(vragen: number[], beschikbaar: number): number[] {
     .map((e, i) => ({ i, rest: e - Math.floor(e) }))
     .sort((a, b) => b.rest - a.rest);
 
-  for (const { i } of opRest) {
-    if (rest <= 0) break;
-    /* Nooit meer dan gevraagd, ook niet via de restverdeling. */
-    if (toegewezen[i] < vragen[i]) {
-      toegewezen[i] += 1;
-      rest -= 1;
+  /* Meerdere rondes: door het afkappen op `gevraagd` kan er na de eerste ronde
+     nog voorraad over zijn die een andere winkel wél kwijt kan. */
+  let vorigeRest = -1;
+  while (rest > 0 && rest !== vorigeRest) {
+    vorigeRest = rest;
+    for (const { i } of opRest) {
+      if (rest <= 0) break;
+      if (toegewezen[i] < vragen[i].gevraagd) {
+        toegewezen[i] += 1;
+        rest -= 1;
+      }
     }
   }
   return toegewezen;
@@ -97,7 +143,9 @@ export async function aanvulAdvies(minimum = 1): Promise<AanvulAdvies> {
   }
 
   /* Alleen sku's waar het magazijn iets van vrij heeft: de rest is inkoopwerk,
-     geen magazijnwerk, en hoort niet op een looplijst. */
+     geen magazijnwerk, en hoort niet op een looplijst.
+     `aanwezig` en `ideaal` komen mee omdat de verdeling ze nodig heeft — zie
+     `urgentie()` hieronder. */
   const ruw = await query<RuweRegel>(
     `WITH vrij AS (
        SELECT sku, sum(vrij)::int AS vrij
@@ -105,7 +153,10 @@ export async function aanvulAdvies(minimum = 1): Promise<AanvulAdvies> {
         WHERE vrij > 0 AND kind <> 'outbound'
         GROUP BY sku
      )
-     SELECT s.branch_id, s.store, s.sku, sum(s.tekort)::int AS tekort,
+     SELECT s.branch_id, s.store, s.sku,
+            sum(s.tekort)::int AS tekort,
+            sum(s.qty)::int    AS aanwezig,
+            sum(s.ideaal)::int AS ideaal,
             a.omschrijving, a.maat
        FROM public.srs_stock s
        JOIN vrij v ON v.sku = s.sku
@@ -139,7 +190,10 @@ export async function aanvulAdvies(minimum = 1): Promise<AanvulAdvies> {
   for (const [sku, vragers] of perSku) {
     const beschikbaar = vrijPerSku.get(sku) ?? 0;
     const verdeling = verdeel(
-      vragers.map((v) => Number(v.tekort)),
+      vragers.map((v) => ({
+        gevraagd: Number(v.tekort),
+        gewicht: Number(v.tekort) * urgentie(v),
+      })),
       beschikbaar
     );
     vragers.forEach((v, i) => {
@@ -153,6 +207,8 @@ export async function aanvulAdvies(minimum = 1): Promise<AanvulAdvies> {
         tekort: Number(v.tekort),
         vrij: beschikbaar,
         toegewezen: verdeling[i],
+        aanwezig: Number(v.aanwezig),
+        ideaal: Number(v.ideaal),
       });
     });
   }
