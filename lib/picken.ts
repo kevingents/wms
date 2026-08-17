@@ -225,6 +225,8 @@ export interface ImportResultaat {
   onbekendeArtikelen: number;
   /** Melding als SRS of storegents niet meewerkte; null als alles goed ging. */
   srsFout: string | null;
+  /** Wachtende regels die alsnog voorraad toegewezen kregen. */
+  alsnogToegewezen: number;
 }
 
 async function nieuweCode(): Promise<string> {
@@ -237,6 +239,82 @@ async function nieuweCode(): Promise<string> {
 /**
  * Haalt nieuw pickwerk binnen uit de core. Veilig om herhaald te draaien.
  */
+/**
+ * Wijst open regels zonder locatie alsnog toe.
+ *
+ * WAAROM DIT NODIG IS
+ * -------------------
+ * Toewijzing gebeurt bij het aanmaken van de opdracht. Was er op dat moment geen
+ * vrije voorraad, dan krijgt de regel geen locatie — en zonder deze functie
+ * houdt hij die nooit, ook niet als er de dag erna een pallet binnenkomt. Dan
+ * staat er werk in de lijst dat niemand kan lopen en dat niemand opmerkt.
+ *
+ * Draait bij elke import mee, zodat wat gisteren niet kon vandaag vanzelf
+ * opgepakt wordt.
+ *
+ * Regels worden op volgorde van aanmaakdatum behandeld: wie het langst wacht,
+ * krijgt de voorraad die binnenkomt. Dat is niet de snelste verdeling maar wel
+ * de uitlegbare — anders krijgt de nieuwste order structureel voorrang omdat hij
+ * toevallig bovenaan de query stond.
+ */
+export async function herwijsOpenRegelsToe(): Promise<{
+  bekeken: number;
+  toegewezen: number;
+}> {
+  const wachtend = await query<{ id: number; sku: string; gevraagd: number }>(
+    `SELECT l.id, l.sku, l.gevraagd
+       FROM wms.pick_lines l
+       JOIN wms.pick_orders o ON o.id = l.pick_order_id
+      WHERE l.status = 'open'
+        AND l.location_id IS NULL
+        AND o.status IN ('open', 'bezig')
+      ORDER BY o.created_at, l.id`
+  );
+
+  let toegewezen = 0;
+
+  for (const regel of wachtend) {
+    /* Per regel opnieuw kijken: een eerdere regel in deze lus kan de voorraad
+       net hebben opgesnoept, en `vrije_voorraad` telt dat mee. */
+    const { toewijzingen } = await kiesLocaties(regel.sku, regel.gevraagd);
+    const beste = toewijzingen[0];
+    if (!beste) continue;
+
+    if (beste.aantal >= regel.gevraagd) {
+      await query(
+        `UPDATE wms.pick_lines
+            SET location_id = $2, volgorde = $3,
+                note = 'Alsnog toegewezen toen er voorraad binnenkwam'
+          WHERE id = $1 AND status = 'open' AND location_id IS NULL`,
+        [regel.id, beste.location_id, beste.sort_order]
+      );
+      toegewezen += 1;
+      continue;
+    }
+
+    /* Maar een deel beschikbaar: de regel krimpt naar wat er ligt en de rest
+       blijft als aparte wachtende regel staan. Zo kan de picker alvast lopen
+       voor wat er wél is. */
+    const rest = regel.gevraagd - beste.aantal;
+    await query(
+      `UPDATE wms.pick_lines
+          SET gevraagd = $2, location_id = $3, volgorde = $4,
+              note = 'Deels toegewezen toen er voorraad binnenkwam'
+        WHERE id = $1 AND status = 'open' AND location_id IS NULL`,
+      [regel.id, beste.aantal, beste.location_id, beste.sort_order]
+    );
+    await query(
+      `INSERT INTO wms.pick_lines (pick_order_id, sku, gevraagd, location_id, volgorde, note)
+       SELECT pick_order_id, sku, $2, NULL, 0, 'Restant zonder voorraad'
+         FROM wms.pick_lines WHERE id = $1`,
+      [regel.id, rest]
+    );
+    toegewezen += 1;
+  }
+
+  return { bekeken: wachtend.length, toegewezen };
+}
+
 export async function importeerPickwerk(door: string | null): Promise<ImportResultaat> {
   const resultaat: ImportResultaat = {
     nieuw: 0,
@@ -246,6 +324,7 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
     uitSrs: 0,
     onbekendeArtikelen: 0,
     srsFout: null,
+    alsnogToegewezen: 0,
   };
 
   /* Welke weborder-bron telt. Standaard SRS, want daar loopt het echte werk.
@@ -386,6 +465,11 @@ export async function importeerPickwerk(door: string | null): Promise<ImportResu
       resultaat.overgeslagen += 1;
     }
   }
+
+  /* Wat eerder niet toegewezen kon worden, kan nu misschien wel — er is net
+     nieuwe voorraad binnengekomen of een andere order is afgerond. */
+  const herwezen = await herwijsOpenRegelsToe();
+  resultaat.alsnogToegewezen = herwezen.toegewezen;
 
   const tekorten = await queryOne<{ n: string }>(
     `SELECT count(*)::text AS n FROM wms.pick_lines

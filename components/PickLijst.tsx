@@ -55,6 +55,9 @@ export function PickLijst({ opdrachten }: { opdrachten: PickOpdracht[] }) {
           : `${data.nieuw} nieuwe opdracht${data.nieuw === 1 ? "" : "en"} met ${data.regels} regels` +
               (data.uitSrs > 0 ? `, waarvan ${data.uitSrs} uit SRS` : "") +
               "." +
+              (data.alsnogToegewezen > 0
+                ? ` ${data.alsnogToegewezen} wachtende regel(s) kregen alsnog voorraad.`
+                : "") +
               (data.zonderVoorraad > 0
                 ? ` Let op: ${data.zonderVoorraad} regel(s) zonder voorraad in het magazijn.`
                 : "")
